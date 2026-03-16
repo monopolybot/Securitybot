@@ -191,9 +191,6 @@ async def main_handler(event):
     message = event.raw_text
     chat_id = str(event.chat_id)
     sender_id = event.sender_id
-    user = await event.get_sender()
-    fn = f"{user.first_name} {user.last_name or ''}".strip()
-    un = f"@{user.username}" if user.username else "لا يوجد"
     
 
     # 1. تسجيل التفاعل التراكمي
