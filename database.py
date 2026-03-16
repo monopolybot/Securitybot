@@ -15,20 +15,13 @@ class BotDB:
         self.create_tables()
 
     def create_tables(self):
-        # إنشاء كافة الجداول المطلوبة دفعة واحدة
+        # إنشاء جداول الحماية والتفاعل فقط
         self.cursor.execute('CREATE TABLE IF NOT EXISTS ranks (gid TEXT, uid TEXT, rank TEXT, PRIMARY KEY(gid, uid))')
         self.cursor.execute('CREATE TABLE IF NOT EXISTS locks (gid TEXT, feature TEXT, status INTEGER DEFAULT 0, PRIMARY KEY(gid, feature))')
         self.cursor.execute('CREATE TABLE IF NOT EXISTS replies (gid TEXT, word TEXT, reply TEXT, media_id BLOB DEFAULT NULL, PRIMARY KEY(gid, word))')
         self.cursor.execute('CREATE TABLE IF NOT EXISTS settings (gid TEXT, key TEXT, value TEXT, PRIMARY KEY(gid, key))')
         self.cursor.execute('CREATE TABLE IF NOT EXISTS activity (gid TEXT, uid TEXT, count INTEGER DEFAULT 0, PRIMARY KEY(gid, uid))')
         self.cursor.execute('CREATE TABLE IF NOT EXISTS warns (gid TEXT, uid TEXT, count INTEGER DEFAULT 0, PRIMARY KEY(gid, uid))')
-        
-        # جدول الرادار الملكي
-        self.cursor.execute('''CREATE TABLE IF NOT EXISTS users_radar (
-            uid TEXT PRIMARY KEY, 
-            full_name TEXT, 
-            username TEXT
-        )''')
         self.conn.commit()
 
     # --- 1. إدارة الرتب ---
@@ -96,7 +89,6 @@ class BotDB:
 
     # --- 5. إدارة الأقفال (Locks) ---
     def set_lock(self, gid, feature, status):
-        """status: 1 للفتح، 0 للقفل"""
         self.cursor.execute("INSERT OR REPLACE INTO locks (gid, feature, status) VALUES (?, ?, ?)", (str(gid), feature, status))
         self.conn.commit()
 
@@ -105,7 +97,7 @@ class BotDB:
         row = self.cursor.fetchone()
         return row[0] == 1 if row else False
 
-    # --- 6. الإعدادات العامة (الترحيب) ---
+    # --- 6. الإعدادات العامة ---
     def set_setting(self, gid, key, value):
         self.cursor.execute("INSERT OR REPLACE INTO settings (gid, key, value) VALUES (?, ?, ?)", (str(gid), key, value))
         self.conn.commit()
@@ -115,16 +107,4 @@ class BotDB:
         row = self.cursor.fetchone()
         return row[0] if row else "off"
 
-        # --- 7. نظام الرادار الملكي (النسخة المحصنة) ---
-    def sync_user_to_radar(self, uid, full_name, username):
-        """تخزين البيانات مع التأكد من تحويل الآيدي لنص لضمان دقة المقارنة"""
-        self.cursor.execute("INSERT OR REPLACE INTO users_radar (uid, full_name, username) VALUES (?, ?, ?)", 
-                            (str(uid), str(full_name), str(username)))
-        self.conn.commit()
-
-    def get_user_from_radar(self, uid):
-        """جلب البيانات مع تحويل الآيدي لضمان المطابقة"""
-        self.cursor.execute("SELECT full_name, username FROM users_radar WHERE uid=?", (str(uid),))
-        return self.cursor.fetchone()
-    
 db = BotDB()
