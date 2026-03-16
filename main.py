@@ -257,7 +257,7 @@ async def main_handler(event):
         )
         await event.reply(sharaf_text)
 
-    # 5. نظام "كشف" الإمبراطوري - يدعم الرد والآيدي والمعرف والأعضاء المغادرين
+        # 5. نظام "كشف" الإمبراطوري (النسخة اليدوية الصافية)
     if message.startswith("كشف"):
         parts = message.split()
         target_id = None
@@ -267,7 +267,7 @@ async def main_handler(event):
         if event.is_reply:
             reply_msg = await event.get_reply_message()
             target_id = reply_msg.sender_id
-        # الحالة 2: الكشف عبر الآيدي أو المعرف (كشف 12345 أو كشف @anas)
+        # الحالة 2: الكشف عبر الآيدي أو المعرف
         elif len(parts) > 1:
             input_data = parts[1]
             try:
@@ -280,44 +280,34 @@ async def main_handler(event):
         
         if target_id:
             try:
-                # محاولة جلب البيانات اللحظية من سيرفرات تليجرام
+                # جلب البيانات اللحظية مباشرة من تليجرام
                 if not target_user:
                     target_user = await client.get_entity(target_id)
                 
                 current_name = f"{target_user.first_name} {target_user.last_name or ''}".strip()
                 current_un = f"@{target_user.username}" if target_user.username else "لا يوجد"
                 
-                # جلب البيانات القديمة من الرادار للمقارنة
-                radar_data = db.get_user_from_radar(str(target_id))
-                old_info_text = ""
-                if radar_data:
-                    old_name, old_un = radar_data
-                    if old_name != current_name:
-                        old_info_text += f"\n📜 **الاسـم الـقديم:** {old_name}"
-                    if old_un != current_un:
-                        old_info_text += f"\n🔗 **الـمعرف الـقديم:** {old_un}"
-                
-                # جلب الرتبة والمشاركات
+                # جلب الرتبة والمشاركات من الـ Database (الموجودة فعلياً)
                 t_rank = "مالك 👑" if target_id == OWNER_ID else db.get_rank(chat_id, target_id)
                 t_count = db.get_user_messages(chat_id, target_id)
                 t_title = get_user_title(t_count)
 
                 kashf_text = (
                     f"📋 **| كـشـف الـهـويـة الإمـبـراطـوري**\n━━━━━━━━━━━━━━\n"
-                    f"👤 **الاسـم الـحالي:** {current_name}"
-                    f"{old_info_text}\n"
+                    f"👤 **الاسـم الـحالي:** {current_name}\n"
                     f"🆔 **الآيدي:** `{target_id}`\n"
                     f"🔗 **الـمـعرف الحالي:** {current_un}\n"
                     f"🎖️ **الـرتبـة:** {t_rank}\n"
                     f"🏆 **الـلـقـب:** {t_title}\n"
                     f"📈 **الـمـشاركات:** {t_count} رسالة\n"
                     f"🕒 **الـتـوقيـت:** {datetime.now().strftime('%I:%M %p')}\n"
-                    f"🛡️ **الـحـالـة:** مـراقب بـالرادار ✅\n━━━━━━━━━━━━━━"
+                    f"🛡️ **الـحـالـة:** مـتصل بالـنظام ✅\n━━━━━━━━━━━━━━"
                 )
                 await event.reply(kashf_text)
             except Exception as e:
-                await event.reply("❌ **فشل الكشف:** لم أتمكن من العثور على هذا المستخدم في قاعدة بيانات تليجرام.")
+                await event.reply("❌ **فشل الكشف:** لم أتمكن من العثور على هذا المستخدم.")
         return
+        
 
     # تحقق من صلاحيات الإدارة للأوامر القادمة
     if not await check_privilege(event, "ادمن"):
