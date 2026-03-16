@@ -184,21 +184,6 @@ async def get_target_info(event, parts):
             continue
     return target_id, target_user
 
-async def check_user_radar(user_id, current_name, current_username):
-    user_id = str(user_id)
-    old_data = db.get_user_from_radar(user_id)
-    if old_data:
-        old_name, old_username = old_data
-        msg = None
-        if str(current_name) != str(old_name):
-            msg = f"🚨 **| رادار كـشـف الـهـويـة (تغيير اسم)**\n━━━━━━━━━━━━━━\n👤 **المستخدم:** [{current_name}](tg://user?id={user_id})\n🆔 **الآيدي:** `{user_id}`\n\n📜 **القديم:** {old_name}\n✨ **الجديد:** {current_name}\n━━━━━━━━━━━━━━"
-        elif str(current_username) != str(old_username):
-            msg = f"🚨 **| رادار كـشـف الـهـويـة (تغيير معرف)**\n━━━━━━━━━━━━━━\n👤 **المستخدم:** {current_name}\n🆔 **الآيدي:** `{user_id}`\n\n🔗 **القديم:** {old_username}\n✨ **الجديد:** {current_username}\n━━━━━━━━━━━━━━"
-        if msg:
-            for gid in ALLOWED_GROUPS:
-                try: await client.send_message(int(gid), msg)
-                except: continue
-    db.sync_user_to_radar(user_id, current_name, current_username)
     
 # --- 5. معالج الرسائل والأوامر الرئيسي ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
@@ -209,7 +194,7 @@ async def main_handler(event):
     user = await event.get_sender()
     fn = f"{user.first_name} {user.last_name or ''}".strip()
     un = f"@{user.username}" if user.username else "لا يوجد"
-    await check_user_radar(sender_id, fn, un)
+    
 
     # 1. تسجيل التفاعل التراكمي
     if not event.is_private:
@@ -534,53 +519,5 @@ print("--- [Status: Complete | Fixed Media & Delete Issues] ---")
 client.loop.create_task(monopoly_radar.start_radar_system(client, ALLOWED_GROUPS))
 
 
-# =========================================================
-# --- [نظام رادار مونوبولي المطور: الإصدار 8.0 النهائي] ---
-# =========================================================
 
-@client.on(events.Raw(types.UpdateUser))
-async def identity_tracker_radar(event):
-    """صيد التغييرات التي تحدث في البروفايل مباشرة"""
-    try:
-        user_id = event.user_id
-        user_full = await client.get_entity(user_id)
-        fn = f"{user_full.first_name} {user_full.last_name or ''}".strip()
-        un = f"@{user_full.username}" if user_full.username else "لا يوجد"
-        # استدعاء المحرك الذي وضعناه في الأعلى للمقارنة
-        await check_user_radar(user_id, fn, un)
-    except: pass
-
-async def identity_full_sync():
-    """الجرد الموزع: يمنع التعليق تماماً عبر توزيع الجهد لضمان سلاسة الرد القصوى"""
-    try: await client.send_message(OWNER_ID, "🚀 **الرادار الإمبراطوري يعمل بنمط 'التوزيع السلس'.. وداعاً للتعليق!**")
-    except: pass
-    
-    while True:
-        print("⏳ تبدأ الآن دورية الرادار السلسة (10 آلاف عضو)...", flush=True)
-        for gid in ALLOWED_GROUPS:
-            try:
-                async for user in client.iter_participants(gid):
-                    if user.bot: continue
-                    
-                    fn = f"{user.first_name} {user.last_name or ''}".strip()
-                    un = f"@{user.username}" if user.username else "لا يوجد"
-                    
-                    # فحص الرادار ومقارنة الأسماء
-                    await check_user_radar(user.id, fn, un)
-                    
-                    # --- السر في فك التعليق ---
-                    # التوقف لمدة 0.1 ثانية بعد كل عضو يمنح البوت فرصة لمعالجة الرسائل الواردة فوراً
-                    await asyncio.sleep(0.1) 
-                        
-            except Exception as e:
-                print(f"⚠️ تنبيه: تعثر الرادار في مجموعة {gid}: {e}")
-                continue
-        
-        print("✅ انتهت الجولة الشاملة بنجاح. الدورية القادمة بعد 15 دقيقة.", flush=True)
-        # الاستراحة بين الدوريات (15 دقيقة) لراحة المعالج والحساب
-        await asyncio.sleep(900)
-
-# --- أوامر التشغيل النهائية لضمان عدم التكرار ---
-client.loop.create_task(identity_full_sync())
-print("--- [Monopoly System Online - V8.8 Ultra-Smooth Mode] ---", flush=True)
 client.run_until_disconnected()
