@@ -16,10 +16,10 @@ API_HASH = 'ccb195afa05973cf544600ad3c313b84'
 # تأكد دائماً أن التوكن بين علامتي التنصيص بدون أي مسافات إضافية
 BOT_TOKEN = '8654727197:AAGM3TkKoR_PImPmQ-rSe2lOcITpGMtTkxQ'
 OWNER_ID = 5010882230
-ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369]
+ALLOWED_GROUPS = [-1002695848824, -1003721123319, -1002052564369]
 
 # تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
-client = TelegramClient('Monopoly_Final_Fix_v21', API_ID, API_HASH, sequential_updates=True).start(bot_token=BOT_TOKEN)
+client = TelegramClient('Monopoly_Final_Fix_V1', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 # --- 1. دالة التصفير التلقائي الأسبوعي ---
 async def weekly_auto_reset():
@@ -153,9 +153,6 @@ async def reactive_replies(event):
     elif msg_text == "تصبح على خير":
         await event.reply(f"وأنت من أهل الخير يا {user_title}، أحلام سعيدة ونوم العوافي 💤")
 
-
-        
-
 async def get_target_info(event, parts):
     target_id = None
     target_user = None
@@ -183,8 +180,7 @@ async def get_target_info(event, parts):
         except Exception as e:
             continue
     return target_id, target_user
-
-    
+        
 # --- 5. معالج الرسائل والأوامر الرئيسي ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def main_handler(event):
@@ -192,7 +188,6 @@ async def main_handler(event):
     chat_id = str(event.chat_id)
     sender_id = event.sender_id
     
-
     # 1. تسجيل التفاعل التراكمي
     if not event.is_private:
         db.increase_messages(chat_id, sender_id)
@@ -254,57 +249,21 @@ async def main_handler(event):
         )
         await event.reply(sharaf_text)
 
-        # 5. نظام "كشف" الإمبراطوري (النسخة اليدوية الصافية)
-    if message.startswith("كشف"):
-        parts = message.split()
-        target_id = None
-        target_user = None
-        
-        # الحالة 1: الكشف عبر الرد (Reply)
-        if event.is_reply:
-            reply_msg = await event.get_reply_message()
-            target_id = reply_msg.sender_id
-        # الحالة 2: الكشف عبر الآيدي أو المعرف
-        elif len(parts) > 1:
-            input_data = parts[1]
-            try:
-                if input_data.isdigit():
-                    target_id = int(input_data)
-                elif input_data.startswith("@"):
-                    target_user = await client.get_entity(input_data)
-                    target_id = target_user.id
-            except: pass
-        
-        if target_id:
-            try:
-                # جلب البيانات اللحظية مباشرة من تليجرام
-                if not target_user:
-                    target_user = await client.get_entity(target_id)
-                
-                current_name = f"{target_user.first_name} {target_user.last_name or ''}".strip()
-                current_un = f"@{target_user.username}" if target_user.username else "لا يوجد"
-                
-                # جلب الرتبة والمشاركات من الـ Database (الموجودة فعلياً)
-                t_rank = "مالك 👑" if target_id == OWNER_ID else db.get_rank(chat_id, target_id)
-                t_count = db.get_user_messages(chat_id, target_id)
-                t_title = get_user_title(t_count)
+    # 5. نظام "كشف" - بالرد على العضو (إضافة حماية None)
+    if message == "كشف" and event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.sender_id:
+            target_user = await client.get_entity(reply_msg.sender_id)
+            t_rank = "مالك 👑" if target_user.id == OWNER_ID else db.get_rank(chat_id, target_user.id)
+            t_count = db.get_user_messages(chat_id, target_user.id)
+            t_title = get_user_title(t_count)
+            t_time = datetime.now().strftime("%I:%M %p")
+            
+            kashf_text = (
+                f"📋 **| الـهـويـة الـشـخـصـيـة**\n━━━━━━━━━━━━━━\n👤 **الاسـم:** {target_user.first_name}\n🆔 **الـمـعـرف:** `{target_user.id}`\n🎖️ **الـرتبـة:** {t_rank}\n🏆 **الـلـقـب:** {t_title}\n📈 **الـمـشاركات:** {t_count} رسالة\n🕒 **الـتـوقيـت:** {t_time}\n🛡️ **الـحـالـة:** سـجل نظيف ✅\n━━━━━━━━━━━━━━"
+            )
 
-                kashf_text = (
-                    f"📋 **| كـشـف الـهـويـة الإمـبـراطـوري**\n━━━━━━━━━━━━━━\n"
-                    f"👤 **الاسـم الـحالي:** {current_name}\n"
-                    f"🆔 **الآيدي:** `{target_id}`\n"
-                    f"🔗 **الـمـعرف الحالي:** {current_un}\n"
-                    f"🎖️ **الـرتبـة:** {t_rank}\n"
-                    f"🏆 **الـلـقـب:** {t_title}\n"
-                    f"📈 **الـمـشاركات:** {t_count} رسالة\n"
-                    f"🕒 **الـتـوقيـت:** {datetime.now().strftime('%I:%M %p')}\n"
-                    f"🛡️ **الـحـالـة:** مـتصل بالـنظام ✅\n━━━━━━━━━━━━━━"
-                )
-                await event.reply(kashf_text)
-            except Exception as e:
-                await event.reply("❌ **فشل الكشف:** لم أتمكن من العثور على هذا المستخدم.")
-        return
-        
+            await event.reply(kashf_text)
 
     # تحقق من صلاحيات الإدارة للأوامر القادمة
     if not await check_privilege(event, "ادمن"):
@@ -453,26 +412,7 @@ async def main_handler(event):
             await target_msg.delete()
             try: await event.delete()
             except: pass
-    # --- [نظام الإذاعة الملكي الشامل] ---
-    if message == "اذاعة" and event.is_reply:
-        if not await check_privilege(event, "مدير"):
-            return
-            
-        reply_msg = await event.get_reply_message()
-        broadcast_count = 0
-        status_msg = await event.reply("🚀 **جاري بدء الإذاعة الملكية لجميع المجموعات...**")
-        
-        for gid in ALLOWED_GROUPS:
-            try:
-                await client.send_message(int(gid), reply_msg)
-                broadcast_count += 1
-                await asyncio.sleep(0.5) 
-            except Exception as e:
-                print(f"فشل الإرسال للمجموعة {gid}: {e}")
-
-        await status_msg.edit(f"✅ **تمت الإذاعة بنجاح!**\n━━━━━━━━━━━━━━\n📢 **المجموعات المستلمة:** {broadcast_count}\n🛡️ **المنفذ:** ༺۝༒♛ 🅰🅽🅰🆂 ♛༒۝༻\n━━━━━━━━━━━━━━")
-        return # لإنهاء المعالجة هنا
-        
+                
     # 8. فتح لوحة الأوامر
     if message == "امر":
         buttons_list = [
@@ -504,7 +444,6 @@ client.loop.create_task(weekly_auto_reset())
 print("--- [Monopoly System Online - V7.0 Royal Edition] ---")
 print("--- [Status: Complete | Fixed Media & Delete Issues] ---")
 client.loop.create_task(monopoly_radar.start_radar_system(client, ALLOWED_GROUPS))
-
 
 
 client.run_until_disconnected()
