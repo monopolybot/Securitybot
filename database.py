@@ -4,15 +4,19 @@ import os
 
 class BotDB:
     def __init__(self):
-        # إعداد مسار التخزين (Northflank)
-        self.base_dir = "/app/data"
+                # إعداد مسار التخزين الدائم (المجلد المرتبط بالـ Volume)
+        self.base_dir = "/data"
+        
+        # التأكد من وجود المجلد (لن يحذف عند الريستارت لأنه Volume)
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir, exist_ok=True)
 
+        # مسار قاعدة البيانات النهائي
         self.db_path = os.path.join(self.base_dir, "monopoly_royal.db")
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.cursor = self.conn.cursor() 
         self.create_tables()
+
 
     def create_tables(self):
         # إنشاء جداول الحماية والتفاعل فقط
