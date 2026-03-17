@@ -414,8 +414,10 @@ async def main_handler(event):
             except: pass
     # --- [نظام الإذاعة الملكي الشامل] ---
     if message == "اذاعة" and event.is_reply:
-        if not await check_privilege(event, "مدير"):
-            return
+        # إذا كنت أنت المالك، سيتخطى فحص الرتبة ويعمل فوراً
+        if event.sender_id != OWNER_ID:
+            if not await check_privilege(event, "مدير"):
+                return
             
         reply_msg = await event.get_reply_message()
         broadcast_count = 0
@@ -423,16 +425,16 @@ async def main_handler(event):
         
         for gid in ALLOWED_GROUPS:
             try:
-                # إرسال الرسالة (نص، صورة، ميديا) لجميع المجموعات المسموحة
-                await client.send_message(int(gid), reply_msg)
+                # إرسال الرسالة (نص، صورة، فيديو، ملف) بشكل صحيح
+                await client.send_message(int(gid), reply_msg) 
                 broadcast_count += 1
-                # تأخير بسيط لحماية البوت من الحظر (Flood Wait)
-                await asyncio.sleep(0.5) 
+                await asyncio.sleep(0.5) # حماية من الحظر
             except Exception as e:
-                print(f"فشل الإرسال للمجموعة {gid}: {e}")
+                print(f"فشل الإرسال للمجموعة {gid}: {e}", flush=True)
 
         await status_msg.edit(f"✅ **تمت الإذاعة بنجاح!**\n━━━━━━━━━━━━━━\n📢 **المجموعات المستلمة:** {broadcast_count}\n🛡️ **المنفذ:** ༺۝༒♛ 🅰🅽🅰🆂 ♛༒۝༻\n━━━━━━━━━━━━━━")
         return
+
         
     # 8. فتح لوحة الأوامر
     if message == "امر":
