@@ -5,7 +5,9 @@ import os
 class BotDB:
     def __init__(self):
                 # إعداد مسار التخزين الدائم (المجلد المرتبط بالـ Volume)
-        self.base_dir = "/data"
+                # تغيير المسار ليكون داخل مجلد التطبيق الذي يملك الصلاحيات
+        self.base_dir = "/app/data"
+
         
         # التأكد من وجود المجلد (لن يحذف عند الريستارت لأنه Volume)
         if not os.path.exists(self.base_dir):
