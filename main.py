@@ -16,7 +16,7 @@ API_HASH = 'ccb195afa05973cf544600ad3c313b84'
 # تأكد دائماً أن التوكن بين علامتي التنصيص بدون أي مسافات إضافية
 BOT_TOKEN = '8654727197:AAGM3TkKoR_PImPmQ-rSe2lOcITpGMtTkxQ'
 OWNER_ID = 5010882230
-ALLOWED_GROUPS = [-1002695848824, -1003721123319, -1002052564369]
+ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369]
 
 # تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
 client = TelegramClient('Monopoly_Final_Fix_V1', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
@@ -412,7 +412,28 @@ async def main_handler(event):
             await target_msg.delete()
             try: await event.delete()
             except: pass
-                
+    # --- [نظام الإذاعة الملكي الشامل] ---
+    if message == "اذاعة" and event.is_reply:
+        if not await check_privilege(event, "مدير"):
+            return
+            
+        reply_msg = await event.get_reply_message()
+        broadcast_count = 0
+        status_msg = await event.reply("🚀 **جاري بدء الإذاعة الملكية لجميع المجموعات...**")
+        
+        for gid in ALLOWED_GROUPS:
+            try:
+                # إرسال الرسالة (نص، صورة، ميديا) لجميع المجموعات المسموحة
+                await client.send_message(int(gid), reply_msg)
+                broadcast_count += 1
+                # تأخير بسيط لحماية البوت من الحظر (Flood Wait)
+                await asyncio.sleep(0.5) 
+            except Exception as e:
+                print(f"فشل الإرسال للمجموعة {gid}: {e}")
+
+        await status_msg.edit(f"✅ **تمت الإذاعة بنجاح!**\n━━━━━━━━━━━━━━\n📢 **المجموعات المستلمة:** {broadcast_count}\n🛡️ **المنفذ:** ༺۝༒♛ 🅰🅽🅰🆂 ♛༒۝༻\n━━━━━━━━━━━━━━")
+        return
+        
     # 8. فتح لوحة الأوامر
     if message == "امر":
         buttons_list = [
