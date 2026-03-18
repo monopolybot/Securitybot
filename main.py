@@ -413,11 +413,14 @@ async def main_handler(event):
             try: await event.delete()
             except: pass
     # --- [نظام الإذاعة الملكي الشامل] ---
-    if message == "اذاعة" and event.is_reply:
-        # إذا كنت أنت المالك، سيتخطى فحص الرتبة ويعمل فوراً
-        if event.sender_id != OWNER_ID:
-            if not await check_privilege(event, "مدير"):
-                return
+    # --- [نظام الإذاعة الملكي الشامل] ---
+    if event.raw_text.startswith("اذاعة") and event.is_reply:
+        # جلب رتبة الشخص الذي أرسل الأمر
+        user_rank = await get_user_rank(event.chat_id, event.sender_id)
+        
+        # السماح فقط للمالك، المنشئ، والمشرفين (أي شخص ليس "عضو")
+        if "عضو" in user_rank:
+            return await event.reply("⚠️ **عذراً.. هذا الأمر مخصص للملوك والمشرفين فقط!**")
             
         reply_msg = await event.get_reply_message()
         broadcast_count = 0
@@ -425,14 +428,22 @@ async def main_handler(event):
         
         for gid in ALLOWED_GROUPS:
             try:
-                # إرسال الرسالة (نص، صورة، فيديو، ملف) بشكل صحيح
+                # إرسال الرسالة الأصلية مهما كان نوعها (نص، ميديا، ملف)
                 await client.send_message(int(gid), reply_msg) 
                 broadcast_count += 1
-                await asyncio.sleep(0.5) # حماية من الحظر
+                await asyncio.sleep(0.5) # حماية من حظر التليجرام (Flood)
             except Exception as e:
                 print(f"فشل الإرسال للمجموعة {gid}: {e}", flush=True)
 
-        await status_msg.edit(f"✅ **تمت الإذاعة بنجاح!**\n━━━━━━━━━━━━━━\n📢 **المجموعات المستلمة:** {broadcast_count}\n🛡️ **المنفذ:** ༺۝༒♛ 🅰🅽🅰🆂 ♛༒۝༻\n━━━━━━━━━━━━━━")
+        # التقرير الختامي بلمسة ملكية
+        report = (
+            f"✅ **تمت الإذاعة بنجاح!**\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"📢 **المجموعات المستهدفة:** `{broadcast_count}`\n"
+            f"👤 **المنفذ:** {user_rank}\n"
+            f"━━━━━━━━━━━━━━"
+        )
+        await status_msg.edit(report)
         return
 
         
