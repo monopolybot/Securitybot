@@ -412,40 +412,58 @@ async def main_handler(event):
             await target_msg.delete()
             try: await event.delete()
             except: pass
-    # --- [نظام الإذاعة الملكي الشامل] ---
-    # --- [نظام الإذاعة الملكي الشامل] ---
+    # --- [نظام الإذاعة والتثبيت الملكي المطور V3] ---
     if event.raw_text.startswith("اذاعة") and event.is_reply:
-        # جلب رتبة الشخص الذي أرسل الأمر
+        # 1. جلب رتبة الشخص
         user_rank = await get_user_rank(event.chat_id, event.sender_id)
         
-        # السماح فقط للمالك، المنشئ، والمشرفين (أي شخص ليس "عضو")
+        # السماح للمالك والمشرفين (كل من ليس "عضو")
         if "عضو" in user_rank:
-            return await event.reply("⚠️ **عذراً.. هذا الأمر مخصص للملوك والمشرفين فقط!**")
-            
+            return # تجاهل الأعضاء تماماً
+
         reply_msg = await event.get_reply_message()
+        if not reply_msg:
+            return await event.reply("❌ **خطأ: يجب الرد على رسالة (نص/فيديو/صورة) لكى تذيعها.**")
+
         broadcast_count = 0
-        status_msg = await event.reply("🚀 **جاري بدء الإذاعة الملكية لجميع المجموعات...**")
+        status_msg = await event.reply("🚀 **جاري النشر والتثبيت في الممالك الثلاث...**")
         
         for gid in ALLOWED_GROUPS:
             try:
-                # إرسال الرسالة الأصلية مهما كان نوعها (نص، ميديا، ملف)
-                await client.send_message(int(gid), reply_msg) 
+                # محاولة جلب "كيان" المجموعة للتأكد من الوصول إليها
+                target_peer = await client.get_input_entity(int(gid))
+                
+                # إرسال الرسالة (الآن نستخدم الكيان المباشر لضمان وصول الميديا)
+                sent_msg = await client.send_message(target_peer, reply_msg) 
+                
+                # محاولة التثبيت
+                try:
+                    await client(functions.messages.UpdatePinnedMessageRequest(
+                        peer=target_peer,
+                        id=sent_msg.id,
+                        silent=False
+                    ))
+                except Exception as pin_err:
+                    print(f"فشل التثبيت في {gid}: {pin_err}")
+                
                 broadcast_count += 1
-                await asyncio.sleep(0.5) # حماية من حظر التليجرام (Flood)
+                await asyncio.sleep(1) # تأخير بسيط لتجنب سبام تليجرام
             except Exception as e:
-                print(f"فشل الإرسال للمجموعة {gid}: {e}", flush=True)
+                print(f"⚠️ فشل الإرسال للمجموعة {gid}: {str(e)}", flush=True)
 
-        # التقرير الختامي بلمسة ملكية
-        report = (
-            f"✅ **تمت الإذاعة بنجاح!**\n"
-            f"━━━━━━━━━━━━━━\n"
-            f"📢 **المجموعات المستهدفة:** `{broadcast_count}`\n"
-            f"👤 **المنفذ:** {user_rank}\n"
-            f"━━━━━━━━━━━━━━"
-        )
-        await status_msg.edit(report)
+        # التقرير الختامي
+        if broadcast_count > 0:
+            await status_msg.edit(
+                f"👑 **| تـم الـنـشـر والـتـثـبـيـت بـنـجـاح**\n"
+                f"━━━━━━━━━━━━━━\n"
+                f"📢 **المجموعات المستلمة:** `{broadcast_count}`\n"
+                f"👤 **بواسطة:** {user_rank}\n"
+                f"━━━━━━━━━━━━━━"
+            )
+        else:
+            await status_msg.edit("❌ **فشل النشر في جميع المجموعات. تأكد من صلاحيات البوت كمشرف.**")
         return
-
+        
         
     # 8. فتح لوحة الأوامر
     if message == "امر":
