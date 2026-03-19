@@ -426,49 +426,54 @@ async def main_handler(event):
             await target_msg.delete()
             try: await event.delete()
             except: pass
-    # --- [نظام الإذاعة والتثبيت الملكي المطور V3] ---
-    if event.raw_text.startswith("اذاعة") and event.is_reply:
+    # --- [نظام الإذاعة والتثبيت الملكي المطور - النسخة المصححة] ---
+    if event.raw_text.startswith("اذاعة"):
+        # 1. التحقق من وجود رد
+        if not event.is_reply:
+            return # لن يرد البوت إلا إذا كان هناك رد لحماية الخصوصية
+            
+        # 2. التحقق من الرتبة (المالك أو المشرفين فقط)
         user_rank = await get_user_rank(event.chat_id, event.sender_id)
-        
         if "عضو" in user_rank:
-            return 
+            return # تجاهل الأعضاء تماماً
 
         reply_msg = await event.get_reply_message()
-        if not reply_msg:
-            return await event.reply("❌ **خطأ: يجب الرد على رسالة (نص/فيديو/صورة) لكى تذيعها.**")
-
-        broadcast_count = 0
-        status_msg = await event.reply("🚀 **جاري النشر والتثبيت في الممالك الثلاث...**")
+        status_msg = await event.reply("🚀 **جاري البث الملكي وتثبيت الرسالة...**")
         
+        broadcast_count = 0
         for gid in ALLOWED_GROUPS:
             try:
-                target_peer = await client.get_input_entity(int(gid))
-                sent_msg = await client.send_message(target_peer, reply_msg) 
+                # إرسال الرسالة (نص، صورة، فيديو، إلخ)
+                sent_msg = await client.send_message(int(gid), reply_msg)
                 
+                # تثبيت الرسالة في المجموعة المستهدفة
                 try:
                     await client(functions.messages.UpdatePinnedMessageRequest(
-                        peer=target_peer,
+                        peer=int(gid),
                         id=sent_msg.id,
                         silent=False
                     ))
-                except: pass
+                except Exception as e_pin:
+                    print(f"فشل التثبيت في {gid}: {e_pin}")
                 
                 broadcast_count += 1
-                await asyncio.sleep(1) 
-            except Exception as e:
-                print(f"⚠️ فشل الإرسال للمجموعة {gid}: {str(e)}", flush=True)
+                await asyncio.sleep(0.5) # تأخير بسيط لتجنب الحظر
+            except Exception as e_send:
+                print(f"فشل الإرسال إلى {gid}: {e_send}")
 
+        # تحديث رسالة الحالة النهائية
         if broadcast_count > 0:
             await status_msg.edit(
                 f"👑 **| تـم الـنـشـر والـتـثـبـيـت بـنـجـاح**\n"
                 f"━━━━━━━━━━━━━━\n"
-                f"📢 **المجموعات المستلمة:** `{broadcast_count}`\n"
-                f"👤 **بواسطة:** {user_rank}\n"
+                f"📢 **عدد الممالك المستلمة:** `{broadcast_count}`\n"
+                f"👤 **المنفذ:** {user_rank}\n"
                 f"━━━━━━━━━━━━━━"
             )
         else:
-            await status_msg.edit("❌ **فشل النشر. تأكد من صلاحيات البوت كمشرف.**")
-        return
+            await status_msg.edit("❌ **عذراً.. فشلت عملية الإذاعة. تأكد من وجود البوت كمشرف في المجموعات.**")
+        return # إنهاء المعالج هنا لعدم تداخل الأوامر
+
 
         
         
