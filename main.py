@@ -20,7 +20,21 @@ ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369]
 
 # تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
 client = TelegramClient('Monopoly_Final_Fix_V1', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
-
+# --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
+async def get_user_rank(chat_id, user_id):
+    if user_id == OWNER_ID:
+        return "المالك الأساسي 👑"
+    try:
+        from telethon.tl.functions.channels import GetParticipantRequest
+        from telethon.tl.types import ChannelParticipantCreator, ChannelParticipantAdmin
+        permissions = await client(GetParticipantRequest(channel=chat_id, participant=user_id))
+        if isinstance(permissions.participant, ChannelParticipantCreator):
+            return "منشئ المجموعة 🎖️"
+        if isinstance(permissions.participant, ChannelParticipantAdmin):
+            return "مشرف الإدارة 🛡️"
+    except: pass
+    return "عضو 👤"
+    
 # --- 1. دالة التصفير التلقائي الأسبوعي ---
 async def weekly_auto_reset():
     """
@@ -414,12 +428,10 @@ async def main_handler(event):
             except: pass
     # --- [نظام الإذاعة والتثبيت الملكي المطور V3] ---
     if event.raw_text.startswith("اذاعة") and event.is_reply:
-        # 1. جلب رتبة الشخص
         user_rank = await get_user_rank(event.chat_id, event.sender_id)
         
-        # السماح للمالك والمشرفين (كل من ليس "عضو")
         if "عضو" in user_rank:
-            return # تجاهل الأعضاء تماماً
+            return 
 
         reply_msg = await event.get_reply_message()
         if not reply_msg:
@@ -430,28 +442,22 @@ async def main_handler(event):
         
         for gid in ALLOWED_GROUPS:
             try:
-                # محاولة جلب "كيان" المجموعة للتأكد من الوصول إليها
                 target_peer = await client.get_input_entity(int(gid))
-                
-                # إرسال الرسالة (الآن نستخدم الكيان المباشر لضمان وصول الميديا)
                 sent_msg = await client.send_message(target_peer, reply_msg) 
                 
-                # محاولة التثبيت
                 try:
                     await client(functions.messages.UpdatePinnedMessageRequest(
                         peer=target_peer,
                         id=sent_msg.id,
                         silent=False
                     ))
-                except Exception as pin_err:
-                    print(f"فشل التثبيت في {gid}: {pin_err}")
+                except: pass
                 
                 broadcast_count += 1
-                await asyncio.sleep(1) # تأخير بسيط لتجنب سبام تليجرام
+                await asyncio.sleep(1) 
             except Exception as e:
                 print(f"⚠️ فشل الإرسال للمجموعة {gid}: {str(e)}", flush=True)
 
-        # التقرير الختامي
         if broadcast_count > 0:
             await status_msg.edit(
                 f"👑 **| تـم الـنـشـر والـتـثـبـيـت بـنـجـاح**\n"
@@ -461,8 +467,9 @@ async def main_handler(event):
                 f"━━━━━━━━━━━━━━"
             )
         else:
-            await status_msg.edit("❌ **فشل النشر في جميع المجموعات. تأكد من صلاحيات البوت كمشرف.**")
+            await status_msg.edit("❌ **فشل النشر. تأكد من صلاحيات البوت كمشرف.**")
         return
+
         
         
     # 8. فتح لوحة الأوامر
