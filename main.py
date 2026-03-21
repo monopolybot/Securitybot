@@ -485,10 +485,10 @@ async def main_handler(event):
         ]
         await event.respond("♥️ Monopoly مونوبولي لوحة تحكم ♥️", buttons=buttons_list)
 
-# --- 6. نظام الترحيب والوداع الملكي (بالصورة والنص الثابت) ---
-@client.on(events.ChatAction)
+# --- 6. نظام الترحيب والوداع الملكي (حل مشكلة الرسائل المخفية) ---
+@client.on(events.ChatAction(chats=ALLOWED_GROUPS))
 async def welcome_action(event):
-    # 1. تعريف البيانات الملكية (النص والصورة)
+    # بيانات الميديا (الصورة والنص الملكي)
     ROYAL_PHOTO = "AgACAgQAAxkBAAMtaaI-Mn7PdCzJBmz-YjB23xDbnPwAAu0MaxuMGhhRKefZ-RH4mdIBAAMCAAN4AAM6BA"
     ROYAL_TEXT = (
         "👑 **شعب مونوبولي العظيم** 👑\n\n"
@@ -502,25 +502,21 @@ async def welcome_action(event):
         "💥 **دمتم بخير وبحفظ الله ورعايته** 💥"
     )
 
-    # 2. معالجة حدث الانضمام (دخول عضو جديد)
-    if event.user_joined or event.user_added:
+    # التحقق من نوع الحدث (دخول، إضافة، مغادرة)
+    if event.user_joined or event.user_added or event.user_left or event.user_kicked:
         try:
-            # إرسال الصورة مع النص الملكي (بدون ذكر معلومات العضو)
+            # إرسال الصورة مع النص الملكي مباشرة
             await client.send_file(event.chat_id, ROYAL_PHOTO, caption=ROYAL_TEXT)
-            # اختياري: حذف رسالة التليجرام الأصلية "انضم فلان" لجعل الجروب أنظف
-            await event.delete()
+            
+            # محاولة حذف رسالة التليجرام "الباهتة" إن وجدت ليبقى الشات نظيفاً
+            try:
+                await event.delete()
+            except:
+                pass # إذا كانت مخفية أصلاً لن يجد ما يحذفه
+                
         except Exception as e:
-            print(f"خطأ في ترحيب الملوك: {e}")
+            print(f"⚠️ خطأ في نظام التنبيه الملكي: {e}")
 
-    # 3. معالجة حدث المغادرة (خروج عضو)
-    elif event.user_left or event.user_kicked:
-        try:
-            # إرسال نفس الصورة والنص عند المغادرة كتحذير للبقية
-            await client.send_file(event.chat_id, ROYAL_PHOTO, caption=ROYAL_TEXT)
-            # حذف رسالة التليجرام الأصلية "غادر فلان"
-            await event.delete()
-        except Exception as e:
-            print(f"خطأ في وداع الملوك: {e}")
 
 # --- استدعاء الموديولات المساعدة ---
 import ranks, locks, tag, callbacks, monopoly_radar
