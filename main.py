@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from telethon import TelegramClient, events, Button, types
 from telethon.tl.types import ChatBannedRights  # هذا السطر الذي سيحل مشكلة الكتم والحظر
 from database import db
-
+from telethon.tl.types import UpdateBotChatInviteRequester, UpdateNewChannelMessage, MessageService, MessageActionChatAddUser
 # استدعاء المسار من القاعدة مباشرة
 PROTECT_DIR = db.base_dir 
 
@@ -21,7 +21,7 @@ ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369, -1002695848824
 
 
 # تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
-client = TelegramClient('Monopoly_Final_Fix_V2', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+client = TelegramClient('Monopoly_Royal_Fix_V6', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 # --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
 async def get_user_rank(chat_id, user_id):
     if user_id == OWNER_ID:
@@ -488,14 +488,13 @@ async def main_handler(event):
         await event.respond("♥️ Monopoly مونوبولي لوحة تحكم ♥️", buttons=buttons_list)
 
 
-# --- 6. نظام الترحيب والوداع الملكي (النسخة الذهبية المضمونة) ---
-@client.on(events.ChatAction) # تركناها عامة هنا لضمان "صيد" الحدث
-async def welcome_action(event):
-    # التأكد أن الحدث وقع في إحدى المجموعات المسموحة فقط
-    if event.chat_id not in ALLOWED_GROUPS:
-        return
 
-    # بيانات الميديا الملكية (الصورة والنص)
+
+# --- 6. نظام الترحيب والوداع الملكي (مطور لروابط الانضمام) ---
+@client.on(events.ChatAction)
+async def welcome_action(event):
+    if event.chat_id not in ALLOWED_GROUPS: return
+    
     ROYAL_PHOTO = "AgACAgQAAxkBAAMtaaI-Mn7PdCzJBmz-YjB23xDbnPwAAu0MaxuMGhhRKefZ-RH4mdIBAAMCAAN4AAM6BA"
     ROYAL_TEXT = (
         "👑 **شعب مونوبولي العظيم** 👑\n\n"
@@ -509,20 +508,30 @@ async def welcome_action(event):
         "💥 **دمتم بخير وبحفظ الله ورعايته** 💥"
     )
 
-    # التحقق من نوع الحدث (انضمام أو مغادرة أو إضافة)
+    # التحقق من الدخول عبر الرابط (user_joined) أو الإضافة أو المغادرة
     if event.user_joined or event.user_added or event.user_left or event.user_kicked:
         try:
-            # إرسال الصورة مع النص الملكي
             await client.send_file(event.chat_id, ROYAL_PHOTO, caption=ROYAL_TEXT)
-            
-            # محاولة حذف رسالة "انضم/غادر فلان" الباهتة ليبقى الجروب نظيفاً
             try:
-                await event.delete()
+                await event.delete() # حذف رسالة "انضم عبر الرابط" إذا ظهرت
             except:
-                pass 
-                
+                pass
         except Exception as e:
-            print(f"⚠️ خطأ في نظام التنبيه الملكي: {e}")
+            print(f"Error in Royal Welcome: {e}")
+
+# إضافة معالج خاص لروابط الانضمام التي تتطلب موافقة أو تحديثات الأعضاء
+@client.on(events.Raw(types.UpdateChannelParticipant))
+async def raw_welcome(event):
+    if event.channel_id in [abs(i) for i in ALLOWED_GROUPS]: # التحقق من الآيدي
+        # إذا كان العضو جديداً تماماً (دخول عبر رابط)
+        if isinstance(event.new_participant, types.ChannelParticipant):
+            # هنا نضع نفس كود الإرسال لضمان اشتغاله مع الروابط
+            ROYAL_PHOTO = "AgACAgQAAxkBAAMtaaI-Mn7PdCzJBmz-YjB23xDbnPwAAu0MaxuMGhhRKefZ-RH4mdIBAAMCAAN4AAM6BA"
+            ROYAL_TEXT = "👑 **شعب مونوبولي العظيم** 👑\n\n(نفس النص الملكي...)"
+            try:
+                await client.send_file(event.key.chat_id, ROYAL_PHOTO, caption=ROYAL_TEXT)
+            except:
+                pass
 
 
 # --- استدعاء الموديولات المساعدة ---
