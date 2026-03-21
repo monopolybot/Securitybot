@@ -16,10 +16,12 @@ API_HASH = 'ccb195afa05973cf544600ad3c313b84'
 # تأكد دائماً أن التوكن بين علامتي التنصيص بدون أي مسافات إضافية
 BOT_TOKEN = '8654727197:AAGM3TkKoR_PImPmQ-rSe2lOcITpGMtTkxQ'
 OWNER_ID = 5010882230
-ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369]
+# --- قائمة المجموعات المسموحة المحدثة ---
+ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369, -1002695848824]
+
 
 # تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
-client = TelegramClient('Monopoly_Final_Fix_V1', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+client = TelegramClient('Monopoly_Final_Fix_V2', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 # --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
 async def get_user_rank(chat_id, user_id):
     if user_id == OWNER_ID:
@@ -485,10 +487,15 @@ async def main_handler(event):
         ]
         await event.respond("♥️ Monopoly مونوبولي لوحة تحكم ♥️", buttons=buttons_list)
 
-# --- 6. نظام الترحيب والوداع الملكي (حل مشكلة الرسائل المخفية) ---
-@client.on(events.ChatAction(chats=ALLOWED_GROUPS))
+
+# --- 6. نظام الترحيب والوداع الملكي (النسخة الذهبية المضمونة) ---
+@client.on(events.ChatAction) # تركناها عامة هنا لضمان "صيد" الحدث
 async def welcome_action(event):
-    # بيانات الميديا (الصورة والنص الملكي)
+    # التأكد أن الحدث وقع في إحدى المجموعات المسموحة فقط
+    if event.chat_id not in ALLOWED_GROUPS:
+        return
+
+    # بيانات الميديا الملكية (الصورة والنص)
     ROYAL_PHOTO = "AgACAgQAAxkBAAMtaaI-Mn7PdCzJBmz-YjB23xDbnPwAAu0MaxuMGhhRKefZ-RH4mdIBAAMCAAN4AAM6BA"
     ROYAL_TEXT = (
         "👑 **شعب مونوبولي العظيم** 👑\n\n"
@@ -502,17 +509,17 @@ async def welcome_action(event):
         "💥 **دمتم بخير وبحفظ الله ورعايته** 💥"
     )
 
-    # التحقق من نوع الحدث (دخول، إضافة، مغادرة)
+    # التحقق من نوع الحدث (انضمام أو مغادرة أو إضافة)
     if event.user_joined or event.user_added or event.user_left or event.user_kicked:
         try:
-            # إرسال الصورة مع النص الملكي مباشرة
+            # إرسال الصورة مع النص الملكي
             await client.send_file(event.chat_id, ROYAL_PHOTO, caption=ROYAL_TEXT)
             
-            # محاولة حذف رسالة التليجرام "الباهتة" إن وجدت ليبقى الشات نظيفاً
+            # محاولة حذف رسالة "انضم/غادر فلان" الباهتة ليبقى الجروب نظيفاً
             try:
                 await event.delete()
             except:
-                pass # إذا كانت مخفية أصلاً لن يجد ما يحذفه
+                pass 
                 
         except Exception as e:
             print(f"⚠️ خطأ في نظام التنبيه الملكي: {e}")
