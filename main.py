@@ -485,18 +485,42 @@ async def main_handler(event):
         ]
         await event.respond("♥️ Monopoly مونوبولي لوحة تحكم ♥️", buttons=buttons_list)
 
-# --- 6. نظام الترحيب والعمليات التلقائية ---
+# --- 6. نظام الترحيب والوداع الملكي (بالصورة والنص الثابت) ---
 @client.on(events.ChatAction)
 async def welcome_action(event):
+    # 1. تعريف البيانات الملكية (النص والصورة)
+    ROYAL_PHOTO = "AgACAgQAAxkBAAMtaaI-Mn7PdCzJBmz-YjB23xDbnPwAAu0MaxuMGhhRKefZ-RH4mdIBAAMCAAN4AAM6BA"
+    ROYAL_TEXT = (
+        "👑 **شعب مونوبولي العظيم** 👑\n\n"
+        "👈 **يمنع التبادل على الخاص** 👉\n\n"
+        "⚡ **تجنباً لأي نصب واحتيال** ⚡\n\n"
+        "🤝 **نرجوا إبلاغ أعضاء الإدارة عن أي**\n"
+        "   ⛔ **شخص يقوم بتوزيع روابط** ⛔\n"
+        " **جروبات أخرى عن طريق الخاص** 🤝\n\n"
+        "نرجوا منكم التعاون معنا لكي نستطيع تقديم وتوفير لكم بيئة مناسبة وخالية من الجواسيس والروابط والنصابين.\n\n"
+        "👑 **الجروب جروبكم ونحن بخدمتكم** 👑\n\n"
+        "💥 **دمتم بخير وبحفظ الله ورعايته** 💥"
+    )
+
+    # 2. معالجة حدث الانضمام (دخول عضو جديد)
     if event.user_joined or event.user_added:
-        current_gid = str(event.chat_id)
-        new_user = await event.get_user()
-        
-        # ترحيب خاص بالمطور أنس
-        if new_user and new_user.id == OWNER_ID:
-            await event.respond("👑 نورت المجموعة بطلتك يا مطورنا أنس! تحياتي.")
-        elif new_user and db.get_setting(current_gid, "welcome_status") == "on":
-            await event.respond(f"✨ نورت المجموعة يا {new_user.first_name}! ننتظر تفاعلك 🌹")
+        try:
+            # إرسال الصورة مع النص الملكي (بدون ذكر معلومات العضو)
+            await client.send_file(event.chat_id, ROYAL_PHOTO, caption=ROYAL_TEXT)
+            # اختياري: حذف رسالة التليجرام الأصلية "انضم فلان" لجعل الجروب أنظف
+            await event.delete()
+        except Exception as e:
+            print(f"خطأ في ترحيب الملوك: {e}")
+
+    # 3. معالجة حدث المغادرة (خروج عضو)
+    elif event.user_left or event.user_kicked:
+        try:
+            # إرسال نفس الصورة والنص عند المغادرة كتحذير للبقية
+            await client.send_file(event.chat_id, ROYAL_PHOTO, caption=ROYAL_TEXT)
+            # حذف رسالة التليجرام الأصلية "غادر فلان"
+            await event.delete()
+        except Exception as e:
+            print(f"خطأ في وداع الملوك: {e}")
 
 # --- استدعاء الموديولات المساعدة ---
 import ranks, locks, tag, callbacks, monopoly_radar
