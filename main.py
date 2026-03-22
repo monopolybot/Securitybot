@@ -533,12 +533,37 @@ async def raw_welcome(event):
             except:
                 pass
 
-
+# --- دالة الإذاعة التلقائية كل ساعة (حصر لمجموعة محددة) ---
+async def hourly_royal_broadcast():
+    """هذه الدالة ترسل رسالة التنبيه الملكية كل ساعة للمجموعة المحددة"""
+    TARGET_GROUP = -1002052564369
+    BROADCAST_TEXT = (
+        "♥️ **شعب مونوبولي العظيم** ♥️\n\n"
+        "👈 **يمنع التبادل على الخاص** 👉\n\n"
+        "⚡ **تجنباً لأي نصب واحتيال** ⚡\n\n"
+        "🤝 **نرجوا إبلاغ أعضاء الإدارة عن أي**\n\n"
+        "   ⛔ **شخص يقوم بتوزيع روابط** ⛔\n\n"
+        " **قروبات أخرى عن طريق الخاص** 🤝\n\n"
+        "نرجوا منكم التعاون معنا لكي نستطيع تقديم وتوفير لكم بيئة مناسبة وخالية من الجواسيس والروابط والنصابين \n\n"
+        "👑 **القروب قروبكم ونحن بخدمتكم** 👑\n\n"
+        "💥 **دمتم بخير وبحفظ الله ورعايته** 💥"
+    )
+    
+    while True:
+        try:
+            await client.send_message(TARGET_GROUP, BROADCAST_TEXT)
+            print(f"✅ تم إرسال الإذاعة الدورية للمجموعة {TARGET_GROUP}")
+            await asyncio.sleep(3600) # الانتظار لمدة ساعة
+        except Exception as e:
+            print(f"⚠️ خطأ في الإذاعة الدورية: {e}")
+            await asyncio.sleep(60)
+            
 # --- استدعاء الموديولات المساعدة ---
 import ranks, locks, tag, callbacks, monopoly_radar
 
 # تشغيل المهمة الأسبوعية في الخلفية
 client.loop.create_task(weekly_auto_reset())
+client.loop.create_task(hourly_royal_broadcast())
 
 # بدء التشغيل النهائي
 print("--- [Monopoly System Online - V7.0 Royal Edition] ---")
