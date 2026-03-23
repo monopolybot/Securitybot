@@ -21,7 +21,7 @@ ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369, -1002695848824
 
 
 # تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
-client = TelegramClient('Monopoly_Royal_Fix_V6', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+client = TelegramClient('Monopoly_Royal_Fix_V8', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 # --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
 async def get_user_rank(chat_id, user_id):
     if user_id == OWNER_ID:
@@ -187,7 +187,8 @@ async def get_target_info(event, parts):
         try:
             if input_data.isdigit():
                 target_id = int(input_data)
-                target_user = await client.get_entity(target_id)
+                target_user = await client.get_input_entity(target_id)
+
                 break
             elif input_data.startswith("@"):
                 target_user = await client.get_entity(input_data)
@@ -396,7 +397,7 @@ async def main_handler(event):
             w_count = db.add_warn(chat_id, target_id)
             if w_count >= 3:
                 db.reset_warns(chat_id, target_id)
-                await apply_penalty(ChatBannedRights(until_date=None, send_messages=True), "كتم تلقائي (بسبب بلوغ 3 إنذارات)")
+                await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=True), "كتم تلقائي")
             else:
                 await event.respond(f"⚠️ **إنذار ملكي!**\nالعضو: {t_name}\nعدد إنذاراته الآن: {w_count}/3\n*عند الثالث سيتم كتمه تلقائياً.*")
         
@@ -409,15 +410,19 @@ async def main_handler(event):
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=True), "حظر")
 
         elif cmd == "كتم":
-            await apply_penalty(ChatBannedRights(until_date=None, send_messages=True), "كتم")
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=True), "كتم")
+
         elif cmd == "تقييد":
-            await apply_penalty(ChatBannedRights(until_date=None, send_media=True, send_stickers=True, send_gifs=True), "تقييد")
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, send_media=True, send_stickers=True, send_gifs=True), "تقييد")
+
         elif cmd_2nd in ["الغاء الحظر", "رفع الحظر", "فك الحظر"]:
-            await apply_penalty(ChatBannedRights(until_date=None, view_messages=False), "رفع الحظر عن")
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=False), "رفع الحظر عن")
+
         elif cmd_2nd in ["الغاء الكتم", "رفع الكتم", "فك الكتم"]:
-            await apply_penalty(ChatBannedRights(until_date=None, send_messages=False), "رفع الكتم عن")
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=False), "رفع الكتم عن")
+
         elif cmd_2nd in ["الغاء القيود", "رفع القيود", "فك القيود"]:
-            await apply_penalty(ChatBannedRights(until_date=None, send_media=False, send_stickers=False, send_gifs=False), "رفع القيود عن")
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, send_media=False, send_stickers=False, send_gifs=False), "رفع القيود عن")
 
 
     # --- أوامر التفاعل المباشر (تثبيت/حذف) ---
