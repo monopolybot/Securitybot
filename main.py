@@ -381,7 +381,8 @@ async def main_handler(event):
                 db.set_rank(str(gid), target_id, "عضو")
             return await event.respond(f"👑 **| 👑 قـرار إعـفـاء إداري 👑**\n━━━━━━━━━━━━━━\n📝 **الـقـرار:** سـحب الـصـلاحـيات\n👤 **الـمـسـتـخدم:** {t_name}\n📉 **الـرتبـة:** عـضـو\n━━━━━━━━━━━━━━")
 
-        async def apply_penalty(rights, action_name):
+        async def apply_penalty(target_id, rights, action_name):
+
             try:
                 from telethon.tl.functions.channels import EditBannedRequest
                 await client(EditBannedRequest(event.chat_id, target_id, rights))
@@ -405,7 +406,8 @@ async def main_handler(event):
 
         # أوامر العقوبات (بدون أندرسكور)
         if cmd == "حظر":
-            await apply_penalty(ChatBannedRights(until_date=None, view_messages=True), "حظر")
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=True), "حظر")
+
         elif cmd == "كتم":
             await apply_penalty(ChatBannedRights(until_date=None, send_messages=True), "كتم")
         elif cmd == "تقييد":
