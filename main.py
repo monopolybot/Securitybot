@@ -21,7 +21,7 @@ ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369, -1002695848824
 
 
 # تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
-client = TelegramClient('Monopoly_Royal_Fix_V8', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+client = TelegramClient('Monopoly_Final_Fix_V8', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 # --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
 async def get_user_rank(chat_id, user_id):
     if user_id == OWNER_ID:
