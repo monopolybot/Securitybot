@@ -7,6 +7,8 @@ from telethon import TelegramClient, events, Button, types
 from telethon.tl.types import ChatBannedRights  # هذا السطر الذي سيحل مشكلة الكتم والحظر
 from database import db
 from telethon.tl.types import UpdateBotChatInviteRequester, UpdateNewChannelMessage, MessageService, MessageActionChatAddUser
+from telethon import functions
+
 # استدعاء المسار من القاعدة مباشرة
 PROTECT_DIR = db.base_dir 
 
@@ -20,8 +22,9 @@ OWNER_ID = 5010882230
 ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369, -1002695848824]
 
 
-# تشغيل العميل (Client) - تم تغيير اسم الجلسة هنا لحل مشكلة السجل (Logs)
-client = TelegramClient('Monopoly_Final_Fix_V8', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+# تشغيل العميل (Client) - تم تحديث اسم الجلسة لنسخة V9 الملكية لضمان جلب الآيديات
+client = TelegramClient('Monopoly_Royal_Session_V9', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+
 # --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
 async def get_user_rank(chat_id, user_id):
     if user_id == OWNER_ID:
@@ -172,31 +175,43 @@ async def reactive_replies(event):
 async def get_target_info(event, parts):
     target_id = None
     target_user = None
+    
+    # 1. إذا كان الأمر رداً على رسالة (طريقة مضمونة)
     if event.is_reply:
         reply = await event.get_reply_message()
-        target_id = reply.sender_id
-        target_user = await reply.get_sender()
-        return target_id, target_user
+        if reply and reply.sender_id:
+            target_id = reply.sender_id
+            try:
+                target_user = await reply.get_sender()
+            except:
+                target_user = None # في حال كان الحساب محذوفاً
+            return target_id, target_user
     
-    # البحث عن اليوزر في الكلمة الثانية أو الثالثة (لدعم أوامر الفراغ)
+    # 2. البحث عن الآيدي أو اليوزر في نص الأمر (مثل: كتم 123456)
     potential_inputs = []
     if len(parts) > 1: potential_inputs.append(parts[1])
     if len(parts) > 2: potential_inputs.append(parts[2])
 
     for input_data in potential_inputs:
         try:
+            # إذا كان المدخل آيدي رقمي
             if input_data.isdigit():
                 target_id = int(input_data)
-                target_user = await client.get_input_entity(target_id)
-
+                # التصحيح الأهم: استخدام get_entity بدلاً من get_input_entity
+                target_user = await client.get_entity(target_id)
                 break
+            # إذا كان المدخل يبدأ بـ @
             elif input_data.startswith("@"):
                 target_user = await client.get_entity(input_data)
                 target_id = target_user.id
                 break
         except Exception as e:
+            # تجاهل الخطأ والمحاولة مع الكلمة التالية لضمان عدم توقف البوت
+            print(f"⚠️ تنبيه: تعذر العثور على المستخدم {input_data}: {e}")
             continue
+            
     return target_id, target_user
+
         
 # --- 5. معالج الرسائل والأوامر الرئيسي ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
