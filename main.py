@@ -394,7 +394,7 @@ async def main_handler(event):
                 db.set_rank(str(gid), target_id, "عضو")
             return await event.respond(f"👑 **| 👑 قـرار إعـفـاء إداري 👑**\n━━━━━━━━━━━━━━\n📝 **الـقـرار:** سـحب الـصـلاحـيات\n👤 **الـمـسـتـخدم:** {t_name}\n📉 **الـرتبـة:** عـضـو\n━━━━━━━━━━━━━━")
 
-                async def apply_penalty(target_id, rights, action_name):
+        async def apply_penalty(target_id, rights, action_name):
             try:
                 from telethon.tl.functions.channels import EditBannedRequest
                 # استخدام target_id مباشرة لإجبار التنفيذ حتى لو الـ Entity غير معروف
