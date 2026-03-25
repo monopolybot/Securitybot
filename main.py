@@ -176,41 +176,38 @@ async def get_target_info(event, parts):
     target_id = None
     target_user = None
     
-    # 1. إذا كان الأمر رداً على رسالة (طريقة مضمونة)
+    # 1. الرد على رسالة
     if event.is_reply:
         reply = await event.get_reply_message()
         if reply and reply.sender_id:
             target_id = reply.sender_id
-            try:
-                target_user = await reply.get_sender()
-            except:
-                target_user = None # في حال كان الحساب محذوفاً
+            try: target_user = await reply.get_sender()
+            except: target_user = None
             return target_id, target_user
     
-    # 2. البحث عن الآيدي أو اليوزر في نص الأمر (مثل: كتم 123456)
+    # 2. البحث في النص (آيدي أو يوزر)
     potential_inputs = []
     if len(parts) > 1: potential_inputs.append(parts[1])
     if len(parts) > 2: potential_inputs.append(parts[2])
 
     for input_data in potential_inputs:
         try:
-            # إذا كان المدخل آيدي رقمي
             if input_data.isdigit():
                 target_id = int(input_data)
-                # التصحيح الأهم: استخدام get_entity بدلاً من get_input_entity
-                target_user = await client.get_entity(target_id)
+                # محاولة جلب المستخدم، إذا فشل سيبقى target_id موجوداً للتنفيذ
+                try: target_user = await client.get_entity(target_id)
+                except: target_user = None 
                 break
-            # إذا كان المدخل يبدأ بـ @
             elif input_data.startswith("@"):
                 target_user = await client.get_entity(input_data)
                 target_id = target_user.id
                 break
         except Exception as e:
-            # تجاهل الخطأ والمحاولة مع الكلمة التالية لضمان عدم توقف البوت
-            print(f"⚠️ تنبيه: تعذر العثور على المستخدم {input_data}: {e}")
+            print(f"⚠️ تنبيه: {e}")
             continue
             
     return target_id, target_user
+
 
         
 # --- 5. معالج الرسائل والأوامر الرئيسي ---
@@ -397,14 +394,17 @@ async def main_handler(event):
                 db.set_rank(str(gid), target_id, "عضو")
             return await event.respond(f"👑 **| 👑 قـرار إعـفـاء إداري 👑**\n━━━━━━━━━━━━━━\n📝 **الـقـرار:** سـحب الـصـلاحـيات\n👤 **الـمـسـتـخدم:** {t_name}\n📉 **الـرتبـة:** عـضـو\n━━━━━━━━━━━━━━")
 
-        async def apply_penalty(target_id, rights, action_name):
-
+                async def apply_penalty(target_id, rights, action_name):
             try:
                 from telethon.tl.functions.channels import EditBannedRequest
+                # استخدام target_id مباشرة لإجبار التنفيذ حتى لو الـ Entity غير معروف
                 await client(EditBannedRequest(event.chat_id, target_id, rights))
-                await event.respond(f"⚖️ **| ⚖️ مـحـكـمـة مـونـوبـولي الـعـلـيـا ⚖️**\n━━━━━━━━━━━━━━\n🛠️ **الإجـراء:** {action_name}\n👤 **الـمـسـتهـدف:** {t_name}\n✅ **الـحـالـة:** تـم تـنفيـذ الـحـكم\n━━━━━━━━━━━━━━")
+                # تحديد الاسم للعرض: إذا كان اليوزر معروفاً نضع اسمه، وإذا لا نضع الآيدي
+                display_name = target_user.first_name if target_user else f"المستخدم ({target_id})"
+                await event.respond(f"⚖️ **| ⚖️ مـحـكـمـة مـونـوبـولي الـعـلـيـا ⚖️**\n━━━━━━━━━━━━━━\n🛠️ **الإجـراء:** {action_name}\n👤 **الـمـسـتهـدف:** {display_name}\n✅ **الـحـالـة:** تـم تـنفيـذ الـحـكم\n━━━━━━━━━━━━━━")
             except Exception as e: 
                 await event.respond(f"❌ فشل التنفيذ: {e}")
+
 
 
         # أوامر الإنذار
