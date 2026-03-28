@@ -93,155 +93,46 @@ async def check_privilege(event, required_rank):
     user_rank = db.get_rank(current_gid, event.sender_id)
     ranks_order = {"عضو": 0, "مميز": 1, "ادمن": 2, "مدير": 3, "مالك": 4, "المنشئ": 5}
     return ranks_order.get(user_rank, 0) >= ranks_order.get(required_rank, 0)
-# --- [نظام الدرع الملكي - نسخة الآية الكريمة والدقة العالية] ---
-
-def clean_text_refined(text):
-    if not text: return ""
-    # استبدال الزخارف بمسافات لعدم دمج الكلمات ببعضها
-    search = ["أ", "إ", "آ", "ة", "_", "-", ".", "*", "!", "؟", "،", "\n"]
-    for s in search:
-        text = text.replace(s, " ")
-    
-    # توحيد الـ (ا) والـ (ه) لضمان كشف الكلمة
-    text = text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه")
+# --- [نظام الدرع الملكي لمكافحة المحتوى السيئ] ---
+def clean_text(text):
+    search = ["أ", "إ", "آ", "ة", "_", "-", ".", "*", " ", "!", "؟"]
+    replace = ["ا", "ا", "ا", "ه", "", "", "", "", "", "", ""]
+    for s, r in zip(search, replace):
+        text = text.replace(s, r)
     return text
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def anti_bad_words(event):
-    if not event.raw_text:
+    if not event.raw_text or await check_privilege(event, "ادمن"): # استثناء المشرفين
         return
 
-    # استثناء المشرفين (تم تصحيح "ادمن")
-    if await check_privilege(event, "ادمن"): 
-        return
-
-    # تنظيف النص مع الحفاظ على المسافات لمنع الدمج الخاطئ
-    raw_msg = event.raw_text.lower()
-    cleaned_msg = clean_text_refined(raw_msg)
-    
-    # تقسيم النص إلى كلمات منفصلة للفحص الحرفي
-    words_in_message = cleaned_msg.split()
-
-    # التحقق إذا كانت أي كلمة محظورة موجودة كـ "كلمة كاملة"
-    found_bad_word = False
-    for bad_word in BAD_WORDS:
-        if bad_word in words_in_message: # فحص حرفي لكل كلمة على حدة
-            found_bad_word = True
-            break
-    
-    if found_bad_word:
+    cleaned_msg = clean_text(event.raw_text)
+    if any(word in cleaned_msg for word in BAD_WORDS):
         try:
-            await event.delete() # حذف رسالة المخالف فوراً
+            await event.delete() # حذف الرسالة فوراً
+            # دمج مع نظام الإنذارات الموجود في ملفك
+            w_count = db.add_warn(str(event.chat_id), event.sender_id)
             
-            chat_id = str(event.chat_id)
-            user_id = event.sender_id
-            w_count = db.add_warn(chat_id, user_id)
-            
-            # رسالة التحذير مع الآية القرآنية وتصميم ملكي
             warn_txt = (
-                f"⚠️ **تـنـبـيـه مـلـكـي حـازم**\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"📖 **قال تعالى:**\n"
-                f"《 **مَّا يَلْفِظُ مِن قَوْلٍ إِلَّا لَدَيْهِ رَقِيبٌ عَتِيدٌ** 》\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"👤 **المخالف:** [{event.sender.first_name}](tg://user?id={user_id})\n"
-                f"🚫 **المخالفة:** استخدام ألفاظ محظورة\n"
-                f"⚖️ **الإنذارات:** ({w_count}/3)\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"💡 *التزم بآداب الحديث لتجنب الطرد التلقائي.*"
+                f"⚠️ **تنبيه ملكي عاجل!**\n━━━━━━━━━━━━━━\n"
+                f"👤 **المخالف:** [{event.sender.first_name}](tg://user?id={event.sender_id})\n"
+                f"🚫 **المخالفة:** كلمات غير لائقة\n"
+                f"⚖️ **العقوبة:** حذف + إنذار ({w_count}/3)\n"
+                f"━━━━━━━━━━━━━━"
             )
-            
             warn_msg = await event.respond(warn_txt)
-
+            
             if w_count >= 3:
-                db.reset_warns(chat_id, user_id)
-                # تنفيذ الكتم
-                await client(functions.channels.EditBannedRequest(
-                    event.chat_id, user_id, 
-                    ChatBannedRights(until_date=None, send_messages=True)
-# --- [نظام الدرع الملكي - النسخة الحازمة والدائمة] ---
-
-def clean_text_refined(text):
-    if not text: return ""
-    # استبدال الزخارف بمسافات (وليس حذفها) لمنع دمج الكلمات مثل "كيك سوداء"
-    search = ["أ", "إ", "آ", "ة", "_", "-", ".", "*", "!", "؟", "،", "\n"]
-    for s in search:
-        text = text.replace(s, " ")
-    
-    # توحيد الأحرف لضمان كشف الكلمات مهما تغيرت كتابتها
-    text = text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه")
-    return text
-
-@client.on(events.NewMessage(chats=ALLOWED_GROUPS))
-async def anti_bad_words(event):
-    if not event.raw_text:
-        return
-
-    # استثناء المشرفين (أنس والإدارة) من الفحص
-    if await check_privilege(event, "ادمن"): 
-        return
-
-    # تنظيف النص مع الحفاظ على المسافات
-    raw_msg = event.raw_text.lower()
-    cleaned_msg = clean_text_refined(raw_msg)
-    
-    # تقسيم النص إلى كلمات منفصلة (لمنع الكشف الخاطئ عند دمج الحروف)
-    words_in_message = cleaned_msg.split()
-
-    # الفحص الحرفي: هل توجد كلمة محظورة مطابقة تماماً لأي كلمة في الرسالة؟
-    found_bad_word = False
-    for bad_word in BAD_WORDS:
-        if bad_word in words_in_message:
-            found_bad_word = True
-            break
-    
-    if found_bad_word:
-        try:
-            # 1. حذف رسالة الشخص المخالف (لحماية الجروب من الكلمة)
-            await event.delete() 
+                from telethon.tl.types import ChatBannedRights
+                db.reset_warns(str(event.chat_id), event.sender_id)
+                await client(functions.channels.EditBannedRequest(event.chat_id, event.sender_id, ChatBannedRights(until_date=None, send_messages=True)))
+                await event.respond(f"⚖️ تم تنفيذ حكم الكتم التلقائي على {event.sender.first_name} لتجاوزه 3 إنذارات.")
             
-            chat_id = str(event.chat_id)
-            user_id = event.sender_id
-            w_count = db.add_warn(chat_id, user_id)
-            
-            # 2. بناء رسالة التحذير الملكية مع الآية الكريمة
-            warn_txt = (
-                f"⚠️ **تـنـبـيـه مـلـكـي حـازم**\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"📖 **قال تعالى:**\n"
-                f"《 **مَّا يَلْفِظُ مِن قَوْلٍ إِلَّا لَدَيْهِ رَقِيبٌ عَتِيدٌ** 》\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"👤 **المخالف:** [{event.sender.first_name}](tg://user?id={user_id})\n"
-                f"🚫 **المخالفة:** استخدام ألفاظ محظورة\n"
-                f"⚖️ **الإنذارات:** ({w_count}/3)\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"💡 *هذه الرسالة ثابتة لتوثيق المخالفة.*"
-            )
-            
-            # 3. إرسال الرسالة (لن نقوم بعمل delete بعدها لتبقى دائماً)
-            await event.respond(warn_txt)
+            await asyncio.sleep(7)
+            await warn_msg.delete()
+        except: pass
+        raise events.StopPropagation # منع البوت من إرسال ردود تلقائية على الكلمة المحذوفة
 
-            # 4. إذا وصل للإنذار الثالث يتم الكتم التلقائي
-            if w_count >= 3:
-                db.reset_warns(chat_id, user_id)
-                await client(functions.channels.EditBannedRequest(
-                    event.chat_id, user_id, 
-                    ChatBannedRights(until_date=None, send_messages=True)
-                ))
-                
-                await event.respond(
-                    f"⚖️ **قـرار كـتـم نـهـائـي**\n"
-                    f"━━━━━━━━━━━━━━\n"
-                    f"تـم كـتـم العضو: {event.sender.first_name}\n"
-                    f"بسبب: تجاوز حد الإنذارات المسموح به.\n"
-                    f"━━━━━━━━━━━━━━"
-                )
-            
-            # منع البوت من إرسال أي ردود أخرى (إيقاف المعالجة)
-            raise events.StopPropagation 
-            
-        except Exception as e:
-            print(f"⚠️ خطأ في نظام الحماية الملكي: {e}")
 
     
 # --- 4. نظام الردود الملكية والذكية (الردود التلقائية) ---
