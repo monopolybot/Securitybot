@@ -443,25 +443,53 @@ async def main_handler(event):
                 db.set_rank(str(gid), target_id, "عضو")
             return await event.respond(f"👑 **| 👑 قـرار إعـفـاء إداري 👑**\n━━━━━━━━━━━━━━\n📝 **الـقـرار:** سـحب الـصـلاحـيات\n👤 **الـمـسـتـخدم:** {t_name}\n📉 **الـرتبـة:** عـضـو\n━━━━━━━━━━━━━━")
 
-        # --- [ دالة تنفيذ العقوبات الموحدة ] ---
+        # --- [ دالة تنفيذ العقوبات الموحدة + السجل الملكي المدمج ] ---
         async def apply_penalty(target_id, rights, action_name, is_kick=False):
-            """نظام تنفيذ العقوبات الملكي (حظر، كتم، طرد، تقييد)"""
+            """نظام تنفيذ العقوبات الملكي مع إرسال تقرير للسجل"""
             try:
                 from telethon.tl.functions.channels import EditBannedRequest
+                
+                # تنفيذ الإجراء التقني
                 if is_kick:
-                    # منطق الطرد: حظر ثم رفع الحظر فوراً لإخراجه من المجموعة
+                    # منطق الطرد: حظر ثم رفع الحظر فوراً
                     await client(EditBannedRequest(event.chat_id, target_id, ChatBannedRights(until_date=None, view_messages=True)))
                     await client(EditBannedRequest(event.chat_id, target_id, ChatBannedRights(until_date=None, view_messages=False)))
                 else:
-                    # تنفيذ العقوبات الأخرى (كتم أو حظر)
+                    # تنفيذ الكتم أو الحظر
                     await client(EditBannedRequest(event.chat_id, target_id, rights))
                 
                 display_name = target_user.first_name if target_user else f"المستخدم ({target_id})"
-                await event.respond(f"⚖️ **| ⚖️ مـحـكـمـة مـونـوبـولي الـعـلـيـا ⚖️**\n━━━━━━━━━━━━━━\n🛠️ **الإجـراء:** {action_name}\n👤 **الـمـسـتهـدف:** {display_name}\n✅ **الـحـالـة:** تـم تـنفيـذ الـحـكم\n━━━━━━━━━━━━━━")
+                
+                # 1. الرد في المجموعة التي حدث فيها الأمر
+                await event.respond(
+                    f"⚖️ **| ⚖️ مـحـكـمـة مـونـوبـولي الـعـلـيـا ⚖️**\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"🛠️ **الإجـراء:** {action_name}\n"
+                    f"👤 **الـمـسـتهـدف:** {display_name}\n"
+                    f"✅ **الـحـالـة:** تـم تـنفيـذ الـحـكم\n"
+                    f"━━━━━━━━━━━━━━"
+                )
+
+                # 2. إرسال سجل (Log) لكل المجموعات المسموحة
+                log_text = (
+                    f"📜 **| تـقـريـر عـقـوبـة إداري**\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"👤 **الـمـنـفـذ:** [{event.sender.first_name}](tg://user?id={sender_id})\n"
+                    f"🛠️ **الإجـراء:** {action_name}\n"
+                    f"👤 **الـمـسـتـهدف:** {display_name} (`{target_id}`)\n"
+                    f"📍 **الـمـصـدر:** {event.chat.title}\n"
+                    f"⏰ **الـتـوقـيـت:** {datetime.now().strftime('%I:%M %p')}\n"
+                    f"━━━━━━━━━━━━━━"
+                )
+                
+                for log_gid in ALLOWED_GROUPS:
+                    try: await client.send_message(log_gid, log_text)
+                    except: pass
+
             except Exception as e: 
                 await event.respond(f"❌ **فشل التنفيذ:** `{e}`")
 
-        # --- [ تنفيذ أوامر العقوبات ] ---
+        # --- [ تنفيذ أوامر العقوبات المربوطة بالسجل ] ---
         if cmd == "انذار":
             w_count = db.add_warn(chat_id, target_id)
             if w_count >= 3:
@@ -478,7 +506,6 @@ async def main_handler(event):
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=True), "حظر نهائي")
 
         elif cmd == "طرد":
-            # يعمل بالرد، بالآيدي (طرد 12345)، وباليوزر (طرد @username)
             await apply_penalty(target_id, None, "طرد من المجموعة", is_kick=True)
 
         elif cmd == "كتم":
@@ -489,6 +516,7 @@ async def main_handler(event):
 
         elif cmd_2nd in ["الغاء الكتم", "رفع الكتم", "فك الكتم"]:
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=False), "رفع الكتم")
+                
             
     
 
