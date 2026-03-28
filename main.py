@@ -103,7 +103,7 @@ def clean_text(text):
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def anti_bad_words(event):
-    if not event.raw_text or await check_privilege(event, "ادmon"): # استثناء المشرفين
+    if not event.raw_text or await check_privilege(event, "ادمن"): # استثناء المشرفين
         return
 
     cleaned_msg = clean_text(event.raw_text)
