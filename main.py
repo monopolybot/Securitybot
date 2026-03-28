@@ -133,10 +133,7 @@ async def anti_bad_words(event):
         except: pass
         raise events.StopPropagation # منع البوت من إرسال ردود تلقائية على الكلمة المحذوفة
 
-# --- سطر البداية القديم الخاص بك (سيكون تحت الكود الجديد) ---
-@client.on(events.NewMessage(chats=ALLOWED_GROUPS))
-async def reactive_replies(event):
-    # ... بقية كودك القديم ...
+
     
 # --- 4. نظام الردود الملكية والذكية (الردود التلقائية) ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
