@@ -21,6 +21,8 @@ OWNER_ID = 5010882230
 # --- قائمة المجموعات المسموحة المحدثة ---
 ALLOWED_GROUPS = [-1003791330278, -1003721123319, -1002052564369, -1002695848824]
 
+# ⛔ أضف هنا الكلمات التي تريد حظرها (أضف الكلمات الإباحية التي ظهرت في جروبك)
+BAD_WORDS = ["كلمة1", "كلمة2", "سكس", "إباحي", "زب", "كس", "طيز", "تنتاك", "تعارف", "بزازك", "بز", "لحس", "مص", "زبر", "تمصيلي", "الحسلك", "انيك", "تنتاكي", "انيكك", "قحبة", "قحبه", "شرموطة", "شرموط", "شرموطه", "منيك", "منيوك", "منتاك", "منتاكة", "منتاكه", "كحب", "كحبة", "كحبه"] 
 
 # تشغيل العميل (Client) - تم تحديث اسم الجلسة لنسخة V9 الملكية لضمان جلب الآيديات
 client = TelegramClient('Monopoly_Royal_Session_V9', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
@@ -91,6 +93,50 @@ async def check_privilege(event, required_rank):
     user_rank = db.get_rank(current_gid, event.sender_id)
     ranks_order = {"عضو": 0, "مميز": 1, "ادمن": 2, "مدير": 3, "مالك": 4, "المنشئ": 5}
     return ranks_order.get(user_rank, 0) >= ranks_order.get(required_rank, 0)
+# --- [نظام الدرع الملكي لمكافحة المحتوى السيئ] ---
+def clean_text(text):
+    search = ["أ", "إ", "آ", "ة", "_", "-", ".", "*", " ", "!", "؟"]
+    replace = ["ا", "ا", "ا", "ه", "", "", "", "", "", "", ""]
+    for s, r in zip(search, replace):
+        text = text.replace(s, r)
+    return text
+
+@client.on(events.NewMessage(chats=ALLOWED_GROUPS))
+async def anti_bad_words(event):
+    if not event.raw_text or await check_privilege(event, "ادmon"): # استثناء المشرفين
+        return
+
+    cleaned_msg = clean_text(event.raw_text)
+    if any(word in cleaned_msg for word in BAD_WORDS):
+        try:
+            await event.delete() # حذف الرسالة فوراً
+            # دمج مع نظام الإنذارات الموجود في ملفك
+            w_count = db.add_warn(str(event.chat_id), event.sender_id)
+            
+            warn_txt = (
+                f"⚠️ **تنبيه ملكي عاجل!**\n━━━━━━━━━━━━━━\n"
+                f"👤 **المخالف:** [{event.sender.first_name}](tg://user?id={event.sender_id})\n"
+                f"🚫 **المخالفة:** كلمات غير لائقة\n"
+                f"⚖️ **العقوبة:** حذف + إنذار ({w_count}/3)\n"
+                f"━━━━━━━━━━━━━━"
+            )
+            warn_msg = await event.respond(warn_txt)
+            
+            if w_count >= 3:
+                from telethon.tl.types import ChatBannedRights
+                db.reset_warns(str(event.chat_id), event.sender_id)
+                await client(functions.channels.EditBannedRequest(event.chat_id, event.sender_id, ChatBannedRights(until_date=None, send_messages=True)))
+                await event.respond(f"⚖️ تم تنفيذ حكم الكتم التلقائي على {event.sender.first_name} لتجاوزه 3 إنذارات.")
+            
+            await asyncio.sleep(7)
+            await warn_msg.delete()
+        except: pass
+        raise events.StopPropagation # منع البوت من إرسال ردود تلقائية على الكلمة المحذوفة
+
+# --- سطر البداية القديم الخاص بك (سيكون تحت الكود الجديد) ---
+@client.on(events.NewMessage(chats=ALLOWED_GROUPS))
+async def reactive_replies(event):
+    # ... بقية كودك القديم ...
     
 # --- 4. نظام الردود الملكية والذكية (الردود التلقائية) ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
