@@ -500,6 +500,63 @@ async def main_handler(event):
         
         elif cmd_2nd == "رفع انذار":
             db.reset_warns(chat_id, target_id)
+        # --- [ دالة تنفيذ العقوبات الموحدة + السجل الملكي المدمج ] ---
+        async def apply_penalty(target_id, rights, action_name, is_kick=False):
+            """نظام تنفيذ العقوبات الملكي مع إرسال تقرير للسجل"""
+            try:
+                from telethon.tl.functions.channels import EditBannedRequest
+                
+                # تنفيذ الإجراء التقني
+                if is_kick:
+                    # منطق الطرد: حظر ثم رفع الحظر فوراً
+                    await client(EditBannedRequest(event.chat_id, target_id, ChatBannedRights(until_date=None, view_messages=True)))
+                    await client(EditBannedRequest(event.chat_id, target_id, ChatBannedRights(until_date=None, view_messages=False)))
+                else:
+                    # تنفيذ الكتم أو الحظر أو التقييد أو رفع القيود
+                    await client(EditBannedRequest(event.chat_id, target_id, rights))
+                
+                display_name = target_user.first_name if (target_user and hasattr(target_user, 'first_name')) else f"المستخدم ({target_id})"
+                
+                # 1. الرد في المجموعة التي حدث فيها الأمر
+                await event.respond(
+                    f"⚖️ **| ⚖️ مـحـكـمـة مـونـوبـولي الـعـلـيـا ⚖️**\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"🛠️ **الإجـراء:** {action_name}\n"
+                    f"👤 **الـمـسـتهـدف:** {display_name}\n"
+                    f"✅ **الـحـالـة:** تـم تـنفيـذ الـحـكم\n"
+                    f"━━━━━━━━━━━━━━"
+                )
+
+                # 2. إرسال سجل (Log) لكل المجموعات المسموحة
+                log_text = (
+                    f"📜 **| تـقـريـر عـقـوبـة إداري**\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"👤 **الـمـنـفـذ:** [{event.sender.first_name}](tg://user?id={sender_id})\n"
+                    f"🛠️ **الإجـراء:** {action_name}\n"
+                    f"👤 **الـمـسـتـهدف:** {display_name} (`{target_id}`)\n"
+                    f"📍 **الـمـصـدر:** {event.chat.title}\n"
+                    f"⏰ **الـتـوقـيـت:** {datetime.now().strftime('%I:%M %p')}\n"
+                    f"━━━━━━━━━━━━━━"
+                )
+                
+                for log_gid in ALLOWED_GROUPS:
+                    try: await client.send_message(log_gid, log_text)
+                    except: pass
+
+            except Exception as e: 
+                await event.respond(f"❌ **فشل التنفيذ:** `{e}`")
+
+        # --- [ تنفيذ أوامر العقوبات المربوطة بالسجل ] ---
+        if cmd == "انذار":
+            w_count = db.add_warn(chat_id, target_id)
+            if w_count >= 3:
+                db.reset_warns(chat_id, target_id)
+                await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=True), "كتم تلقائي (3 إنذارات)")
+            else:
+                await event.respond(f"⚠️ **إنذار ملكي!**\nالعضو: {t_name}\nعدد إنذاراته الآن: {w_count}/3")
+        
+        elif cmd_2nd == "رفع انذار":
+            db.reset_warns(chat_id, target_id)
             await event.respond(f"✅ تم تصفير إنذارات {t_name}.")
 
         elif cmd == "حظر":
@@ -511,12 +568,21 @@ async def main_handler(event):
         elif cmd == "كتم":
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=True), "كتم ملكي")
 
+        # --- الأوامر التي سألت عنها ---
+        elif cmd == "تقييد":
+            # التقييد هنا يمنع إرسال الميديا والروابط مع السماح بالكلام (نص فقط)
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, send_media=True, send_stickers=True, send_gifs=True, embed_links=True), "تقييد الوسائط")
+
+        elif cmd_2nd in ["رفع القيود", "فك التقييد", "الغاء التقييد"]:
+            # إعادة كافة الصلاحيات للعضو (كل القيم False تعني لا يوجد منع)
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=False, send_messages=False, send_media=False, send_stickers=False, send_gifs=False, embed_links=False), "رفع كافة القيود")
+
         elif cmd_2nd in ["الغاء الحظر", "رفع الحظر", "فك الحظر"]:
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=False), "رفع الحظر")
 
         elif cmd_2nd in ["الغاء الكتم", "رفع الكتم", "فك الكتم"]:
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=False), "رفع الكتم")
-                
+            
             
     
 
