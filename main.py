@@ -138,6 +138,7 @@ async def anti_bad_words(event):
         except Exception as e:
             print(f"Error in Shield System: {e}")
             
+            
 
     
 # --- 4. نظام الردود الملكية والذكية (الردود التلقائية) ---
@@ -442,24 +443,25 @@ async def main_handler(event):
                 db.set_rank(str(gid), target_id, "عضو")
             return await event.respond(f"👑 **| 👑 قـرار إعـفـاء إداري 👑**\n━━━━━━━━━━━━━━\n📝 **الـقـرار:** سـحب الـصـلاحـيات\n👤 **الـمـسـتـخدم:** {t_name}\n📉 **الـرتبـة:** عـضـو\n━━━━━━━━━━━━━━")
 
-                async def apply_penalty(target_id, rights, action_name, is_kick=False):
+        # --- [ دالة تنفيذ العقوبات الموحدة ] ---
+        async def apply_penalty(target_id, rights, action_name, is_kick=False):
             """نظام تنفيذ العقوبات الملكي (حظر، كتم، طرد، تقييد)"""
             try:
                 from telethon.tl.functions.channels import EditBannedRequest
                 if is_kick:
-                    # منطق الطرد: حظر ثم رفع الحظر فوراً
+                    # منطق الطرد: حظر ثم رفع الحظر فوراً لإخراجه من المجموعة
                     await client(EditBannedRequest(event.chat_id, target_id, ChatBannedRights(until_date=None, view_messages=True)))
                     await client(EditBannedRequest(event.chat_id, target_id, ChatBannedRights(until_date=None, view_messages=False)))
                 else:
-                    # تنفيذ العقوبات الأخرى
+                    # تنفيذ العقوبات الأخرى (كتم أو حظر)
                     await client(EditBannedRequest(event.chat_id, target_id, rights))
                 
                 display_name = target_user.first_name if target_user else f"المستخدم ({target_id})"
                 await event.respond(f"⚖️ **| ⚖️ مـحـكـمـة مـونـوبـولي الـعـلـيـا ⚖️**\n━━━━━━━━━━━━━━\n🛠️ **الإجـراء:** {action_name}\n👤 **الـمـسـتهـدف:** {display_name}\n✅ **الـحـالـة:** تـم تـنفيـذ الـحـكم\n━━━━━━━━━━━━━━")
             except Exception as e: 
-                await event.respond(f"❌ **فشل التنفيذ:** تأكد من صلاحيات البوت أو صحة الآيدي.\n`{e}`")
+                await event.respond(f"❌ **فشل التنفيذ:** `{e}`")
 
-        # --- أوامر الإنذار ---
+        # --- [ تنفيذ أوامر العقوبات ] ---
         if cmd == "انذار":
             w_count = db.add_warn(chat_id, target_id)
             if w_count >= 3:
@@ -472,27 +474,22 @@ async def main_handler(event):
             db.reset_warns(chat_id, target_id)
             await event.respond(f"✅ تم تصفير إنذارات {t_name}.")
 
-        # --- أوامر العقوبات المباشرة ---
-        if cmd == "حظر":
+        elif cmd == "حظر":
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=True), "حظر نهائي")
 
         elif cmd == "طرد":
+            # يعمل بالرد، بالآيدي (طرد 12345)، وباليوزر (طرد @username)
             await apply_penalty(target_id, None, "طرد من المجموعة", is_kick=True)
 
         elif cmd == "كتم":
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=True), "كتم ملكي")
-
-        elif cmd == "تقييد":
-            await apply_penalty(target_id, ChatBannedRights(until_date=None, send_media=True, send_stickers=True, send_gifs=True), "تقييد الوسائط")
 
         elif cmd_2nd in ["الغاء الحظر", "رفع الحظر", "فك الحظر"]:
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=False), "رفع الحظر")
 
         elif cmd_2nd in ["الغاء الكتم", "رفع الكتم", "فك الكتم"]:
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=False), "رفع الكتم")
-
-        elif cmd_2nd in ["الغاء القيود", "رفع القيود", "فك القيود"]:
-            await apply_penalty(target_id, ChatBannedRights(until_date=None, send_media=False, send_stickers=False, send_gifs=False), "رفع القيود")
+            
     
 
     # --- أوامر التفاعل المباشر (تثبيت/حذف) ---
