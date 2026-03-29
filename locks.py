@@ -47,21 +47,27 @@ async def auto_protection_handler(event):
     msg = event.raw_text or "" 
 
     try:
-        # أ. فحص الروابط والمعرفات
+            
+        # جلب النص من الرسالة أو من وصف الصورة/الفيديو
+        full_text = (event.raw_text or "") + (event.message.caption or "")
+
+        # أ. فحص الروابط المطوّر (شامل للنطاقات الجديدة والوصف)
         if is_locked(gid, "links"):
-            if re.search(r'(https?://\S+|t\.me/\S+|www\.\S+|\S+\.(me|xyz|info))', msg):
-                return await event.delete()
+            if re.search(r'(https?://\S+|t\.me/\S+|telegram\.me/\S+|www\.\S+|\S+\.(me|xyz|info|com|net|org|top|club|vip|online|shop))', full_text, re.IGNORECASE):
+                await event.delete()
+                # إضافة إنذار للعضو لإلزامه بالنظام
+                w_count = db.add_warn(gid, event.sender_id)
+                return await event.respond(f"⚠️ **مـمـنـوع نـشر الروابط!**\n👤 العضو: [{event.sender.first_name}](tg://user?id={event.sender_id})\n⚖️ إنذاراتك: ({w_count}/3)", delete_after=30)
 
+        # ب. فحص المعرفات (@username)
         if is_locked(gid, "usernames"):
-            if re.search(r'@\S+', msg):
+            if re.search(r'@\S+', full_text):
                 return await event.delete()
+    
 
-        # ب. فحص الوسائط
-        if event.photo and is_locked(gid, "photos"):
-            return await event.delete()
-
-        # ج. فحص باقي الأقفال
+        # ج. فحص باقي الأقفال (تم إضافة الصور للفحص التلقائي)
         checks = {
+            "photos": event.photo,
             "stickers": event.sticker,
             "gifs": event.gif,
             "forward": event.fwd_from,
@@ -74,6 +80,7 @@ async def auto_protection_handler(event):
         for key, condition in checks.items():
             if condition and is_locked(gid, key):
                 return await event.delete()
+                
 
     except Exception as e:
         print(f"⚠️ خطأ في نظام الحماية: {e}")
