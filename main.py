@@ -107,14 +107,30 @@ async def anti_bad_words(event):
     if not event.raw_text or await check_privilege(event, "ادمن"):
         return
 
+    gid = str(event.chat_id)
+    # جلب النص الكامل (الرسالة + وصف الصورة/الفيديو)
+    full_text = (event.raw_text or "") + (event.message.caption or "")
+    
+    # 1. فحص الروابط فوراً (قبل الكلمات البذيئة)
+    from locks import is_locked # استدعاء الفحص من ملف الأقفال
+    if is_locked(gid, "links"):
+        # نمط شامل يلقط روابط (be, ly, link, top, xyz) وغيرها
+        link_pattern = r'(https?://\S+|t\.me/\S+|telegram\.me/\S+|www\.\S+|\S+\.(me|xyz|info|com|net|org|top|club|vip|online|shop|be|ly|link))'
+        if re.search(link_pattern, full_text, re.IGNORECASE):
+            try:
+                await event.delete()
+                w_count = db.add_warn(gid, event.sender_id)
+                return await event.respond(f"⚠️ **مـمـنـوع نـشر الروابط!**\n👤 العضو: [{event.sender.first_name}](tg://user?id={event.sender_id})\n⚖️ إنذاراتك: ({w_count}/3)", delete_after=15)
+            except: pass
+
+    # 2. فحص الكلمات البذيئة (تكملة الدرع)
     cleaned_msg = clean_text_refined(event.raw_text.lower())
     words_in_message = cleaned_msg.split()
 
     if any(word in words_in_message for word in BAD_WORDS):
         try:
             await event.delete() 
-            w_count = db.add_warn(str(event.chat_id), event.sender_id)
-            
+            w_count = db.add_warn(gid, event.sender_id)
             warn_txt = (
                 f"⚠️ **تـنـبـيـه مـلـكـي حـازم**\n━━━━━━━━━━━━━━\n"
                 f"📖 **قال تعالى:**\n《 **مَّا يَلْفِظُ مِن قَوْلٍ إِلَّا لَدَيْهِ رَقِيبٌ عَتِيدٌ** 》\n━━━━━━━━━━━━━━\n"
@@ -123,22 +139,16 @@ async def anti_bad_words(event):
                 f"⚖️ **الإنذارات:** ({w_count}/3)\n━━━━━━━━━━━━━━"
             )
             await event.respond(warn_txt)
-
             if w_count >= 3:
-                db.reset_warns(str(event.chat_id), event.sender_id)
-                # الإصلاح هنا: إغلاق الأقواس بشكل صحيح ))
+                db.reset_warns(gid, event.sender_id)
                 await client(functions.channels.EditBannedRequest(
-                    event.chat_id, 
-                    event.sender_id, 
-                    ChatBannedRights(until_date=None, send_messages=True)
+                    event.chat_id, event.sender_id, ChatBannedRights(until_date=None, send_messages=True)
                 ))
                 await event.respond(f"⚖️ تم كتم {event.sender.first_name} لتجاوزه الإنذارات.")
-            
-             
         except Exception as e:
             print(f"Error in Shield System: {e}")
-            
-            
+    
+        
 
     
 # --- 4. نظام الردود الملكية والذكية (الردود التلقائية) ---
