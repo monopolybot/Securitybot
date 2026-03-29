@@ -3,14 +3,13 @@ import io
 from telethon import events
 from database import db
 
-# استدعاء الوظائف من الملف الرئيسي (تأكد أن الملف اسمه main.py أو app.py)
+# استدعاء الوظائف من الملف الرئيسي
 try:
-    from __main__ import client, ALLOWED_GROUPS, check_privilege 
+    from __main__ import client, ALLOWED_GROUPS, check_privilege, OWNER_ID
 except ImportError:
-    # حماية في حال التشغيل التجريبي
     client = None
 
-# خريطة الميزات (عربي - إنجليزي)
+# خريطة الميزات الكاملة (11 ميزة)
 FEATURES = {
     "الروابط": "links",
     "الصور": "photos",
@@ -25,37 +24,41 @@ FEATURES = {
     "الترحيب": "welcome_status"
 }
 
-# --- دوال الربط مع القاعدة (لحل النقص في database.py) ---
+# --- دوال الربط مع القاعدة ---
 def is_locked(gid, feature):
-    db.cursor.execute("SELECT status FROM locks WHERE gid=? AND feature=?", (str(gid), feature))
-    row = db.cursor.fetchone()
-    return row[0] == 1 if row else False
+    try:
+        db.cursor.execute("SELECT status FROM locks WHERE gid=? AND feature=?", (str(gid), feature))
+        row = db.cursor.fetchone()
+        return row[0] == 1 if row else False
+    except:
+        return False
 
 def toggle_lock(gid, feature, status):
     db.cursor.execute("INSERT OR REPLACE INTO locks (gid, feature, status) VALUES (?, ?, ?)", (str(gid), feature, status))
     db.conn.commit()
 
-# --- 1. معالج الحماية التلقائي ---
+# --- 1. معالج الحماية التلقائي الشامل ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def auto_protection_handler(event):
-    if not event.chat_id: return
-    # استثناء الإدارة والمميزين
+    if not event.chat_id or not event.sender_id: return
+    
+    # استثناء الإدارة والمميزين (المطور والمشرفين لا ينطبق عليهم الحذف)
     if await check_privilege(event, "مميز"):
         return
 
     gid = str(event.chat_id)
-    msg = event.raw_text or "" 
+    
+    # جلب النص الكامل (الرسالة + وصف الميديا) لضمان فحص الروابط المخفية
+    text_content = event.raw_text or ""
+    caption_content = event.message.caption or ""
+    full_text = text_content + caption_content
 
     try:
-            
-        # جلب النص من الرسالة أو من وصف الصورة/الفيديو
-        full_text = (event.raw_text or "") + (event.message.caption or "")
-
-        # أ. فحص الروابط المطوّر (شامل للنطاقات الجديدة والوصف)
+        # أ. فحص الروابط المطوّر (تمت إضافة be و ly و link لليوتيوب والاختصارات)
         if is_locked(gid, "links"):
-            if re.search(r'(https?://\S+|t\.me/\S+|telegram\.me/\S+|www\.\S+|\S+\.(me|xyz|info|com|net|org|top|club|vip|online|shop))', full_text, re.IGNORECASE):
+            link_pattern = r'(https?://\S+|t\.me/\S+|telegram\.me/\S+|www\.\S+|\S+\.(me|xyz|info|com|net|org|top|club|vip|online|shop|be|ly|link))'
+            if re.search(link_pattern, full_text, re.IGNORECASE):
                 await event.delete()
-                # إضافة إنذار للعضو لإلزامه بالنظام
                 w_count = db.add_warn(gid, event.sender_id)
                 return await event.respond(f"⚠️ **مـمـنـوع نـشر الروابط!**\n👤 العضو: [{event.sender.first_name}](tg://user?id={event.sender_id})\n⚖️ إنذاراتك: ({w_count}/3)", delete_after=30)
 
@@ -63,9 +66,8 @@ async def auto_protection_handler(event):
         if is_locked(gid, "usernames"):
             if re.search(r'@\S+', full_text):
                 return await event.delete()
-    
 
-        # ج. فحص باقي الأقفال (تم إضافة الصور للفحص التلقائي)
+        # ج. فحص باقي الأقفال (كاملة كما في ملفك الأصلي)
         checks = {
             "photos": event.photo,
             "stickers": event.sticker,
@@ -80,17 +82,17 @@ async def auto_protection_handler(event):
         for key, condition in checks.items():
             if condition and is_locked(gid, key):
                 return await event.delete()
-                
 
     except Exception as e:
         print(f"⚠️ خطأ في نظام الحماية: {e}")
 
-# --- 2. أوامر التحكم اليدوي ---
+# --- 2. أوامر التحكم اليدوي (قفل / فتح) ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def locks_control_handler(event):
     msg = event.raw_text
     gid = str(event.chat_id)
 
+    # التحقق من أن المرسل مدير أو أعلى
     if not await check_privilege(event, "مدير"):
         return
 
@@ -111,7 +113,7 @@ async def locks_control_handler(event):
                 toggle_lock(gid, en_key, 0)
             return await event.respond(f"🔓 تم فتح **{ar_name}** بنجاح.")
 
-    # --- 3. أوامر السيطرة الجماعية ---
+    # --- 3. أوامر السيطرة الجماعية (كاملة) ---
     if msg == "قفل الدردشة":
         try:
             await client.edit_permissions(event.chat_id, send_messages=False)
