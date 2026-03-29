@@ -102,19 +102,19 @@ def clean_text_refined(text):
     text = text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه")
     return text
 
+
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def anti_bad_words(event):
     if not event.raw_text or await check_privilege(event, "ادمن"):
         return
 
     gid = str(event.chat_id)
-    # جلب النص الكامل (الرسالة + وصف الصورة/الفيديو)
-    full_text = (event.raw_text or "") + (event.message.caption or "")
+    # الإصلاح هنا: raw_text تشمل النص والوصف تلقائياً في Telethon
+    full_text = event.raw_text
     
-    # 1. فحص الروابط فوراً (قبل الكلمات البذيئة)
-    from locks import is_locked # استدعاء الفحص من ملف الأقفال
+    # 1. فحص الروابط فوراً
+    from locks import is_locked 
     if is_locked(gid, "links"):
-        # نمط شامل يلقط روابط (be, ly, link, top, xyz) وغيرها
         link_pattern = r'(https?://\S+|t\.me/\S+|telegram\.me/\S+|www\.\S+|\S+\.(me|xyz|info|com|net|org|top|club|vip|online|shop|be|ly|link))'
         if re.search(link_pattern, full_text, re.IGNORECASE):
             try:
@@ -123,8 +123,8 @@ async def anti_bad_words(event):
                 return await event.respond(f"⚠️ **مـمـنـوع نـشر الروابط!**\n👤 العضو: [{event.sender.first_name}](tg://user?id={event.sender_id})\n⚖️ إنذاراتك: ({w_count}/3)", delete_after=15)
             except: pass
 
-    # 2. فحص الكلمات البذيئة (تكملة الدرع)
-    cleaned_msg = clean_text_refined(event.raw_text.lower())
+    # 2. فحص الكلمات البذيئة
+    cleaned_msg = clean_text_refined(full_text.lower())
     words_in_message = cleaned_msg.split()
 
     if any(word in words_in_message for word in BAD_WORDS):
@@ -147,6 +147,7 @@ async def anti_bad_words(event):
                 await event.respond(f"⚖️ تم كتم {event.sender.first_name} لتجاوزه الإنذارات.")
         except Exception as e:
             print(f"Error in Shield System: {e}")
+        
     
         
 
