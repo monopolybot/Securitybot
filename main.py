@@ -134,7 +134,7 @@ async def anti_bad_words(event):
                 ))
                 await event.respond(f"⚖️ تم كتم {event.sender.first_name} لتجاوزه الإنذارات.")
             
-            raise events.StopPropagation 
+             
         except Exception as e:
             print(f"Error in Shield System: {e}")
             
@@ -704,8 +704,13 @@ async def hourly_royal_broadcast():
             print(f"⚠️ خطأ في الإذاعة الدورية: {e}")
             await asyncio.sleep(60)
             
-# --- استدعاء الموديولات المساعدة ---
-import ranks, locks, tag, callbacks, monopoly_radar
+# --- استدعاء الموديولات المساعدة (الترتيب الصحيح) ---
+import locks  # اجعله الأول لضمان فحص الروابط قبل كل شيء
+import ranks
+import tag
+import callbacks
+import monopoly_radar
+
 
 # تشغيل المهمة الأسبوعية في الخلفية
 client.loop.create_task(weekly_auto_reset())
