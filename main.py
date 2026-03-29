@@ -152,29 +152,7 @@ async def reactive_replies(event):
     msg_count = db.get_user_messages(group_id, user_id)
     user_title = get_user_title(msg_count)
     is_admin = await check_privilege(event, "مدير")
-    # الرد الملكي عند ذكر اسم أنس أو الرد عليه
-    anas_names = ["انس", "أنس", "انس السلايطة", "المطور"]
-    is_reply_to_anas = False
-    if event.is_reply:
-        rep_msg = await event.get_reply_message()
-        if rep_msg.sender_id == OWNER_ID:
-            is_reply_to_anas = True
-
-    if any(name in msg_text for name in anas_names) or is_reply_to_anas:
-        anas_responses = [
-            "يا مرحبا ترحيبة البدو بالسيل.. ترحيبةٍ من جوف قلبٍ صدوُقِ. ☕️🐎",
-            "الخيل والليل والبيداء تعرفنا.. والحق أبلج والباطل لجاجه. ⚔️🛡️",
-            "استعن بالله ولا تعجز، فمن اعتمد على الله كفاه، ومن اعتز بغير الله ذل. ✨💎",
-            "من اعتاد على القمة، لم يرضَ بغير السحاب موطناً.. نورت عرشك. 🦅👑",
-            "ما كل من يركب على الخيل خيال.. ولا كل خيلٍ تعجبك هي أصيلة. 🐎📜",
-            "كن كالنخيل عن الأحقاد مرتفعاً.. يُرمى بصخرٍ فيلقي أطيب الثمر. 🌴💎",
-            "إذا هبّت رياحك فاغتنمها، فإن لكل خافقة سكون.. أهلاً بصانع الفرص. ⚙️🌬️",
-            "يا ليتني من قـومٍ لا يجهلون.. مقام الكبار إذا حضروا وأقبلوا. 🎩⚔️",
-            "تجري الرياح كما تجري سفينتنا.. نحن الرياح ونحن البحر والسفن. 🌊🚢",
-            "لا يغير الله ما بقوم حتى يغيروا ما بأنفسهم.. طبت وطاب ممشاك . ✨📖"
-        ]
-        await event.reply(f"👑 **| تـرحـيـب مـلـكـي**\n━━━━━━━━━━━━━━\n✨ {random.choice(anas_responses)}\n━━━━━━━━━━━━━━")
-        return
+    
 
     # ردود كلمة (بوت) المتنوعة
     if msg_text == "بوت":
