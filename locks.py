@@ -50,7 +50,8 @@ async def auto_protection_handler(event):
     
     # جلب النص الكامل (الرسالة + وصف الميديا) لضمان فحص الروابط المخفية
     text_content = event.raw_text or ""
-    caption_content = event.message.caption or ""
+    caption_content = event.raw_text or ""
+    
     full_text = text_content + caption_content
 
     try:
