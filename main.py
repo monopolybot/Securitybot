@@ -755,19 +755,31 @@ async def handle_notes_system(event):
         except ValueError:
             await event.reply("❌ **خطأ في التنسيق!**\nاكتب: تسجيل ملاحظة الاسم : الملاحظة")
 
-    # 2. عرض المفكرة (قائمة مرقمة منظمة)
+    
+    # 2. عرض المفكرة (بنظام الصفحات والأزرار)
     elif text == "عرض المفكرة":
         notes = manage_note("get_active")
         if not notes:
             return await event.reply("📜 **المفكرة الحالية فارغة.**")
         
-        report = "👑 **المفكرة الملكية الحالية** 👑\n" + "—" * 15 + "\n"
-        # عرض أول 15 اسم (ويمكننا إضافة أزرار لاحقاً إذا زاد العدد)
-        for i, n in enumerate(notes, 1):
+        # إعداد الصفحة الأولى (أول 5 ملاحظات)
+        total_notes = len(notes)
+        first_page = notes[:5]
+        
+        report = f"👑 **المفكرة الملكية الحالية** ({total_notes})\n" + "—" * 15 + "\n"
+        for i, n in enumerate(first_page, 1):
             report += f"{i}. 👤 **{n[0]}**: {n[1]}\n"
         
-        report += "\n—" * 5 + "\n💡 لتصفيرها ابدأ 'مفكرة جديدة'"
-        await event.reply(report)
+        # إذا كان هناك أكثر من 5 ملاحظات، نضع زر "التالي"
+        buttons = []
+        if total_notes > 5:
+            buttons = [[Button.inline("التالي ◀️", "note_page_1")]]
+        
+        # إضافة زر إغلاق دائماً
+        buttons.append([Button.inline("❌ إغلاق", "close")])
+        
+        await event.reply(report, buttons=buttons)
+        
 
     # 3. تعديل ملاحظة
     elif text.startswith("تعديل ملاحظة"):
