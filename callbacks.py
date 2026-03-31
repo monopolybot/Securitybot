@@ -104,7 +104,34 @@ async def callback_handler(event):
         # هذه سنستخدمها إذا زاد عدد الأسماء عن 10 لتظهر أزرار "التالي"
         page = int(data.split("_")[1])
         await event.answer(f"📄 أنت الآن في الصفحة {page}", alert=False)
+            # --- التنقل بين صفحات المفكرة الملكية ---
+    elif data.startswith("note_page_"):
+        from notes_manager import manage_note
+        page_num = int(data.split("_")[-1])
+        notes = manage_note("get_active")
         
+        # تقسيم البيانات: كل صفحة 5 ملاحظات
+        start = page_num * 5
+        end = start + 5
+        current_page = notes[start:end]
+        
+        if not current_page and page_num > 0:
+            return await event.answer("⚠️ لا توجد صفحات أخرى", alert=True)
+            
+        report = f"👑 **المفكرة الملكية - صفحة {page_num + 1}**\n" + "—" * 15 + "\n"
+        for i, n in enumerate(current_page, start + 1):
+            report += f"{i}. 👤 **{n[0]}**: {n[1]}\n"
+            
+        # إنشاء أزرار التنقل (ديناميكي)
+        nav_btns = []
+        if page_num > 0:
+            nav_btns.append(Button.inline("▶️ السابق", f"note_page_{page_num - 1}"))
+        if len(notes) > end:
+            nav_btns.append(Button.inline("التالي ◀️", f"note_page_{page_num + 1}"))
+            
+        # تحديث الرسالة بالأزرار الجديدة
+        await event.edit(report, buttons=[nav_btns, [Button.inline("❌ إغلاق", "close")]])
+    
 def event_with_new_data(event, new_data):
     event.data = new_data.encode('utf-8')
     return event
