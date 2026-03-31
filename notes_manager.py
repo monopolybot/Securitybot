@@ -6,7 +6,6 @@ DB_NAME = "monopoly_notes.db"
 def init_notes_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    # جدول الملاحظات النشطة والمؤرشفة
     cursor.execute('''CREATE TABLE IF NOT EXISTS admin_notes 
                       (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                        member_name TEXT, 
@@ -21,7 +20,6 @@ def manage_note(action, data=None):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # 1. إضافة ملاحظة مع منع التكرار
     if action == "add":
         name, content, admin_id = data
         cursor.execute("SELECT * FROM admin_notes WHERE member_name = ? AND status = 'active'", (name,))
@@ -33,35 +31,35 @@ def manage_note(action, data=None):
         conn.commit()
         res = "success"
 
-    # 2. عرض المفكرة الحالية
     elif action == "get_active":
-        cursor.execute("SELECT member_name, note_content, date_added FROM admin_notes WHERE status = 'active' ORDER BY id DESC")
+        cursor.execute("SELECT member_name, note_content, date_added FROM admin_notes WHERE status = 'active' ORDER BY id ASC")
         res = cursor.fetchall()
 
-    # 3. تعديل ملاحظة موجودة
     elif action == "edit":
         name, new_content = data
         cursor.execute("UPDATE admin_notes SET note_content = ? WHERE member_name = ? AND status = 'active'", (new_content, name))
         conn.commit()
         res = "success" if cursor.rowcount > 0 else "not_found"
 
-    # 4. حذف ملاحظة
     elif action == "delete":
         name = data
         cursor.execute("DELETE FROM admin_notes WHERE member_name = ? AND status = 'active'", (name,))
         conn.commit()
         res = "success" if cursor.rowcount > 0 else "not_found"
 
-    # 5. أرشفة المفكرة (بدء مفكرة جديدة)
     elif action == "archive":
         cursor.execute("UPDATE admin_notes SET status = 'archived' WHERE status = 'active'")
         conn.commit()
         res = "success"
 
-    # 6. جلب التاريخ (ملاحظات قديمة بناءً على التاريخ)
-    elif action == "get_history":
-        date_query = data # بصيغة YYYY-MM-DD
-        cursor.execute("SELECT member_name, note_content, date_added FROM admin_notes WHERE date_added LIKE ? AND status = 'archived'", (f"{date_query}%",))
+    elif action == "search":
+        name = data
+        cursor.execute("SELECT member_name, note_content, date_added, status FROM admin_notes WHERE member_name LIKE ? ORDER BY date_added DESC", (f"%{name}%",))
+        res = cursor.fetchall()
+
+    elif action == "get_by_date":
+        date_str = data # YYYY-MM-DD
+        cursor.execute("SELECT member_name, note_content, status FROM admin_notes WHERE date_added LIKE ?", (f"{date_str}%",))
         res = cursor.fetchall()
 
     conn.close()
