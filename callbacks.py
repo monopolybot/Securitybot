@@ -31,7 +31,7 @@ async def callback_handler(event):
     gid = str(event.chat_id)
     
     # التحقق من الصلاحية
-    if not await check_callback_privilege(event, "مدير"):
+    if not await check_callback_privilege(event, "ادمن"):
         return await event.answer("⚠️ عذرا هذه الصلاحيات محصورة لاصحاب الرتب الادارية فقط! 👑", alert=True)
 
     # --- القائمة الرئيسية ---
