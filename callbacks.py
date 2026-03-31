@@ -32,7 +32,7 @@ async def callback_handler(event):
     
     # التحقق من الصلاحية
     if not await check_callback_privilege(event, "مدير"):
-        return await event.answer("⚠️ هذه اللوحة لعلية القوم فقط! 👑", alert=True)
+        return await event.answer("⚠️ عذرا هذه الصلاحيات محصورة لاصحاب الرتب الادارية فقط! 👑", alert=True)
 
     # --- القائمة الرئيسية ---
     if data == "show_main":
