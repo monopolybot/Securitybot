@@ -8,6 +8,7 @@ from telethon.tl.types import ChatBannedRights  # هذا السطر الذي س�
 from database import db
 from telethon.tl.types import UpdateBotChatInviteRequester, UpdateNewChannelMessage, MessageService, MessageActionChatAddUser
 from telethon import functions
+from notes_manager import init_notes_db, manage_note
 
 # استدعاء المسار من القاعدة مباشرة
 PROTECT_DIR = db.base_dir 
@@ -26,6 +27,7 @@ BAD_WORDS = ["كلمة1", "كلمة2", "سكس", "إباحي", "زب", "كس", "
 
 # تشغيل العميل (Client) - تم تحديث اسم الجلسة لنسخة V9 الملكية لضمان جلب الآيديات
 client = TelegramClient('Monopoly_Royal_Session_V9', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+init_notes_db() # تشغيل قاعدة بيانات المفكرة عند بدء البوت
 
 # --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
 async def get_user_rank(chat_id, user_id):
@@ -726,6 +728,63 @@ import monopoly_radar
 # تشغيل المهمة الأسبوعية في الخلفية
 client.loop.create_task(weekly_auto_reset())
 client.loop.create_task(hourly_royal_broadcast())
+@client.on(events.NewMessage(chats=ALLOWED_GROUPS))
+async def handle_notes_commands(event):
+    if not await check_privilege(event, "ادمن"): return
+    text = event.raw_text
+
+    # --- 1. تسجيل ملاحظة ---
+    if text.startswith("تسجيل ملاحظة"):
+        try:
+            raw = text.replace("تسجيل ملاحظة", "").strip()
+            name, content = raw.split(":")
+            res = manage_note("add", (name.strip(), content.strip(), event.sender_id))
+            if res == "duplicate":
+                await event.reply(f"⚠️ الاسم ({name.strip()}) موجود مسبقاً!")
+            else:
+                await event.reply(f"✅ تم تسجيل الملاحظة لـ {name.strip()}")
+        except:
+            await event.reply("❌ اكتب: تسجيل ملاحظة الاسم : الملاحظة")
+
+    # --- 2. تعديل ملاحظة ---
+    elif text.startswith("تعديل ملاحظة"):
+        try:
+            raw = text.replace("تعديل ملاحظة", "").strip()
+            name, content = raw.split(":")
+            res = manage_note("edit", (name.strip(), content.strip()))
+            await event.reply("✅ تم التعديل" if res=="success" else "❌ الاسم غير موجود")
+        except:
+            await event.reply("❌ اكتب: تعديل ملاحظة الاسم : الملاحظة الجديدة")
+
+    # --- 3. حذف ملاحظة ---
+    elif text.startswith("حذف ملاحظة"):
+        name = text.replace("حذف ملاحظة", "").strip()
+        res = manage_note("delete", name)
+        await event.reply("🗑️ تم الحذف" if res=="success" else "❌ لم يتم العثور على الاسم")
+
+    # --- 4. عرض المفكرة الحالية ---
+    elif text == "عرض المفكرة":
+        notes = manage_note("get_active")
+        if not notes: return await event.reply("📜 المفكرة فارغة")
+        msg = "👑 **المفكرة الملكية الحالية** 👑\n\n"
+        for i, n in enumerate(notes, 1):
+            msg += f"{i}. 👤 **{n[0]}**: {n[1]}\n"
+        await event.reply(msg)
+
+    # --- 5. أرشفة وبدء مفكرة جديدة ---
+    elif text == "مفكرة جديدة":
+        manage_note("archive")
+        await event.reply("📂 تم أرشفة المفكرة السابقة والبدء بمفكرة جديدة فارغة.")
+
+    # --- 6. عرض الأرشيف بتاريخ معين ---
+    elif text.startswith("ملاحظات تاريخ"):
+        date_str = text.replace("ملاحظات تاريخ", "").strip() # مثال: 2026-03-31
+        notes = manage_note("get_history", date_str)
+        if not notes: return await event.reply(f"📅 لا توجد ملاحظات مؤرشفة بتاريخ {date_str}")
+        msg = f"📜 **أرشيف ملاحظات {date_str}** 📜\n\n"
+        for i, n in enumerate(notes, 1):
+            msg += f"{i}. 👤 **{n[0]}**: {n[1]}\n"
+        await event.reply(msg)
 
 # بدء التشغيل النهائي
 print("--- [Monopoly System Online - V7.0 Royal Edition] ---")
