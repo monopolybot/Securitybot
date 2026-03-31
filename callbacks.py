@@ -91,7 +91,20 @@ async def callback_handler(event):
 
     elif data == "close":
         await event.delete()
-
+    # --- أزرار نظام المفكرة (المضافة حديثاً) ---
+    
+    # تأكيد الأرشفة وبدء مفكرة جديدة
+    elif data == "confirm_archive":
+        from notes_manager import manage_note
+        manage_note("archive")
+        await event.edit("✅ **إرادة ملكية:** تم نقل كافة الملاحظات للأرشيف بنجاح، والمفكرة الحالية الآن فارغة وجاهزة.")
+        
+    # عرض صفحة معينة (في حال أردنا تطوير التنقل لاحقاً)
+    elif data.startswith("page_"):
+        # هذه سنستخدمها إذا زاد عدد الأسماء عن 10 لتظهر أزرار "التالي"
+        page = int(data.split("_")[1])
+        await event.answer(f"📄 أنت الآن في الصفحة {page}", alert=False)
+        
 def event_with_new_data(event, new_data):
     event.data = new_data.encode('utf-8')
     return event
