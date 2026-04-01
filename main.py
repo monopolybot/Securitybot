@@ -250,25 +250,61 @@ async def get_target_info(event, parts):
 
 
         
-# --- 5. معالج الرسائل والأوامر الرئيسي ---
+
+# --- 5. معالج الرسائل والأوامر الرئيسي (النسخة المصححة والمضمونة) ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def main_handler(event):
     message = event.raw_text
     chat_id = str(event.chat_id)
     sender_id = event.sender_id
     
-    # 1. تسجيل التفاعل التراكمي
+    # 1. تسجيل التفاعل (أول خطوة دائماً)
     if not event.is_private:
         db.increase_messages(chat_id, sender_id)
 
-    # 2. نظام الردود المبرمجة (أضف رد) - الإصلاح الشامل للميديا
+    # 2. نظام "كشف" (رفعناه للأعلى عشان يشتغل فوراً)
+    if message == "كشف" and event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.sender_id:
+            try:
+                target_user = await client.get_entity(reply_msg.sender_id)
+                t_rank = "مالك 👑" if target_user.id == OWNER_ID else db.get_rank(chat_id, target_user.id)
+                t_count = db.get_user_messages(chat_id, target_user.id)
+                t_title = get_user_title(t_count)
+                t_time = datetime.now().strftime("%I:%M %p")
+                
+                kashf_text = (
+                    f"📋 **| الـهـويـة الـشـخـصـيـة**\n━━━━━━━━━━━━━━\n"
+                    f"👤 **الاسـم:** {target_user.first_name}\n"
+                    f"🆔 **الـمـعـرف:** `{target_user.id}`\n"
+                    f"🎖️ **الـرتبـة:** {t_rank}\n"
+                    f"🏆 **الـلـقـب:** {t_title}\n"
+                    f"📈 **الـمـشاركات:** {t_count} رسالة\n"
+                    f"🕒 **الـتـوقيـت:** {t_time}\n"
+                    f"🛡️ **الـحـالـة:** سـجل نظيف ✅\n━━━━━━━━━━━━━━"
+                )
+                await event.reply(kashf_text)
+                return # توقف هنا ولا تبحث عن ردود مبرمجة
+            except Exception as e:
+                print(f"Error in Kashf: {e}")
+
+    # 3. نظام "رتبتي"
+    if message == "رتبتي":
+        my_count = db.get_user_messages(chat_id, sender_id)
+        my_title = get_user_title(my_count)
+        my_rank = "مالك (مطور المشروع) 👑" if sender_id == OWNER_ID else db.get_rank(chat_id, sender_id)
+        info_msg = (
+            f"📋 **| الـهـويـة الـشـخـصـيـة**\n━━━━━━━━━━━━━━\n👤 **الاسـم:** {event.sender.first_name}\n🆔 **الـمـعـرف:** `{sender_id}`\n🎖️ **الـرتبـة:** {my_rank}\n🏆 **الـلـقـب:** {my_title}\n📈 **الـمـشاركات:** {my_count} رسـالة\n🕒 **الـتـوقيـت:** {datetime.now().strftime('%I:%M %p')}\n🛡️ **الـحـالـة:** مـتفاعل مـلكي ✅\n━━━━━━━━━━━━━━"
+        )
+        await event.reply(info_msg)
+        return
+
+    # 4. نظام "الردود المبرمجة" (يأتي لاحقاً لضمان عدم التداخل)
     custom_reply = db.get_reply_data(chat_id, message)
     if custom_reply:
         rep_text, media_id = custom_reply
         try:
-            # التحقق مما إذا كان الرد يحتوي على ميديا (صورة أو ملصق)
             if media_id and str(media_id) != "None":
-                # إرسال الميديا كـ File لضمان ظهور الصورة فوراً
                 await client.send_file(event.chat_id, media_id, caption=rep_text if rep_text else "", reply_to=event.id)
                 return
             elif rep_text:
@@ -276,19 +312,10 @@ async def main_handler(event):
                 return
         except Exception as e_media:
             if rep_text: await event.reply(rep_text)
-            print(f"خطأ في إرسال الميديا المبرمجة: {e_media}")
+            print(f"خطأ في الرد المبرمج: {e_media}")
 
-    # 3. أمر "رتبتي" - لعرض تفاصيل العضو
-    if message == "رتبتي":
-        my_count = db.get_user_messages(chat_id, sender_id)
-        my_title = get_user_title(my_count)
-        # التعرف التلقائي على المالك الأساسي (أنس)
-        my_rank = "مالك (مطور المشروع) 👑" if sender_id == OWNER_ID else db.get_rank(chat_id, sender_id)
-        info_msg = (
-            f"📋 **| الـهـويـة الـشـخـصـيـة**\n━━━━━━━━━━━━━━\n👤 **الاسـم:** {event.sender.first_name}\n🆔 **الـمـعـرف:** `{sender_id}`\n🎖️ **الـرتبـة:** {my_rank}\n🏆 **الـلـقـب:** {my_title}\n📈 **الـمـشاركات:** {my_count} رسـالة\n🕒 **الـتـوقيـت:** {datetime.now().strftime('%I:%M %p')}\n🛡️ **الـحـالـة:** مـتفاعل مـلكي ✅\n━━━━━━━━━━━━━━"
-        )
-        await event.reply(info_msg)
-        return
+    
+        
 
     # 4. نظام "المتفاعلين" - لوحة الشرف الملكية
     if message == "المتفاعلين":
