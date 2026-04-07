@@ -111,44 +111,50 @@ async def anti_bad_words(event):
         return
 
     gid = str(event.chat_id)
-    # الإصلاح هنا: raw_text تشمل النص والوصف تلقائياً في Telethon
     full_text = event.raw_text
     
-    # 1. فحص الروابط فوراً
+    # 1. فحص الروابط (حماية الحدود)
     from locks import is_locked 
     if is_locked(gid, "links"):
         link_pattern = r'(https?://\S+|t\.me/\S+|telegram\.me/\S+|www\.\S+|\S+\.(me|xyz|info|com|net|org|top|club|vip|online|shop|be|ly|link))'
         if re.search(link_pattern, full_text, re.IGNORECASE):
             try:
                 await event.delete()
+                # عقوبة الروابط تبقى إنذارات ليعرف العضو القوانين
                 w_count = db.add_warn(gid, event.sender_id)
                 return await event.respond(f"⚠️ **مـمـنـوع نـشر الروابط!**\n👤 العضو: [{event.sender.first_name}](tg://user?id={event.sender_id})\n⚖️ إنذاراتك: ({w_count}/3)", delete_after=15)
             except: pass
 
-    # 2. فحص الكلمات البذيئة
+    # 2. فحص الكلمات البذيئة (تطبيق المحكمة العليا فوراً)
     cleaned_msg = clean_text_refined(full_text.lower())
     words_in_message = cleaned_msg.split()
 
     if any(word in words_in_message for word in BAD_WORDS):
         try:
+            # الفتح الفوري للنيران (حذف + كتم + إنذار)
             await event.delete() 
-            w_count = db.add_warn(gid, event.sender_id)
+            db.add_warn(gid, event.sender_id) # تسجيل الإنذار في القاعدة للأرشفة
+            
+            # تنفيذ الكتم الفوري (قفل الإرسال نهائياً)
+            await client(functions.channels.EditBannedRequest(
+                event.chat_id, event.sender_id, ChatBannedRights(until_date=None, send_messages=True)
+            ))
+
             warn_txt = (
-                f"⚠️ **تـنـبـيـه مـلـكـي حـازم**\n━━━━━━━━━━━━━━\n"
+                f"⚠️ **تـنـبـيـه مـلـكـي حـازم (طرد من القروب)**\n━━━━━━━━━━━━━━\n"
                 f"📖 **قال تعالى:**\n《 **مَّا يَلْفِظُ مِن قَوْلٍ إِلَّا لَدَيْهِ رَقِيبٌ عَتِيدٌ** 》\n━━━━━━━━━━━━━━\n"
                 f"👤 **المخالف:** [{event.sender.first_name}](tg://user?id={event.sender_id})\n"
-                f"🚫 **المخالفة:** ألفاظ محظورة\n"
-                f"⚖️ **الإنذارات:** ({w_count}/3)\n━━━━━━━━━━━━━━"
+                f"🚫 **المخالفة:** تلفظ بكلمات محظورة\n"
+                f"⚖️ **الإجراء:** كتم فوري + استدعاء الإدارة\n━━━━━━━━━━━━━━"
             )
             await event.respond(warn_txt)
-            if w_count >= 3:
-                db.reset_warns(gid, event.sender_id)
-                await client(functions.channels.EditBannedRequest(
-                    event.chat_id, event.sender_id, ChatBannedRights(until_date=None, send_messages=True)
-                ))
-                await event.respond(f"⚖️ تم كتم {event.sender.first_name} لتجاوزه الإنذارات.")
+            
+            # 📢 إرسال أمر "مشرف" لتفعيل المنشن التلقائي الذي صنعته أنت
+            await event.respond("مشرف") 
+            
         except Exception as e:
-            print(f"Error in Shield System: {e}")
+            print(f"Error in Imperial Shield: {e}")
+            
         
     
         
