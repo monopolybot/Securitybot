@@ -14,7 +14,7 @@ async def tag_handler(event):
     gid = str(chat_id)
 
     # التحقق من الصلاحية (مدير فأعلى لاستخدام المنشن الشامل)
-    if not await check_privilege(event, "مدير"):
+    if not await check_privilege(event, "ادمن"):
         return
 
     # --- 1. أمر بدء المنشن (تاغ للكل) ---
