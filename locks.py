@@ -94,7 +94,7 @@ async def locks_control_handler(event):
     gid = str(event.chat_id)
 
     # التحقق من أن المرسل مدير أو أعلى
-    if not await check_privilege(event, "مدير"):
+    if not await check_privilege(event, "ادمن"):
         return
 
     for ar_name, en_key in FEATURES.items():
