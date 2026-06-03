@@ -587,23 +587,89 @@ async def main_handler(event):
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=True), "حظر نهائي")
 
         elif cmd == "طرد":
-            await apply_penalty(target_id, None, "طرد من المجموعة", is_kick=True)
+    # --- [7] نظام التحكم الإمبراطوري (النسخة الموحدة والكاملة والمحصنة) ---
+    parts = message.split()
+    if not parts: return
+    
+    cmd = parts[0]
+    cmd_2nd = f"{parts[0]} {parts[1]}" if len(parts) >= 2 else cmd
+    target_id, target_user = await get_target_info(event, parts)
+    
+    if target_id: 
+        # 1. الحصانة الملكية للمالك
+        if target_id == OWNER_ID and sender_id != OWNER_ID:
+            return await event.respond("👑 **عذراً، المالك لا يمكن المساس به!**")
 
+        my_rank_val = db.get_rank_value(chat_id, sender_id)
+        target_rank_val = db.get_rank_value(chat_id, target_id)
+        t_name = target_user.first_name if target_user else str(target_id)
+        rank_map = {"ادمن": 2, "مدير": 3, "مالك": 4, "مميز": 1}
+
+        # 2. دالة العقوبات الموحدة (النسخة النهائية مع الحل الجذري للكيان)
+        async def apply_penalty(target_id, rights, action_name, is_kick=False):
+            try:
+                # الحل الجذري لعدم العثور على الكيان
+                user_entity = await client.get_input_entity(target_id)
+                from telethon.tl.functions.channels import EditBannedRequest
+                
+                if is_kick:
+                    await client(EditBannedRequest(event.chat_id, user_entity, ChatBannedRights(until_date=None, view_messages=True)))
+                    await client(EditBannedRequest(event.chat_id, user_entity, ChatBannedRights(until_date=None, view_messages=False)))
+                else:
+                    await client(EditBannedRequest(event.chat_id, user_entity, rights))
+                
+                display_name = target_user.first_name if (target_user and hasattr(target_user, 'first_name')) else f"المستخدم ({target_id})"
+                
+                # رد المحكمة الملكية
+                await event.respond(f"⚖️ **| ⚖️ مـحـكـمـة مـونـوبـولي الـعـلـيـا ⚖️**\n━━━━━━━━━━━━━━\n🛠️ **الإجـراء:** {action_name}\n👤 **الـمـسـتهـدف:** {display_name}\n✅ **الـحـالـة:** تـم تـنفيـذ الـحـكم\n━━━━━━━━━━━━━━")
+
+                # سجل الإدارة للمجموعات
+                log_text = f"📜 **| تـقـريـر عـقـوبـة إداري**\n━━━━━━━━━━━━━━\n👤 **الـمـنـفـذ:** [{event.sender.first_name}](tg://user?id={sender_id})\n🛠️ **الإجـراء:** {action_name}\n👤 **الـمـسـتـهدف:** {display_name} (`{target_id}`)\n📍 **الـمـصـدر:** {event.chat.title}\n⏰ **الـتـوقـيـت:** {datetime.now().strftime('%I:%M %p')}\n━━━━━━━━━━━━━━"
+                for log_gid in ALLOWED_GROUPS:
+                    try: await client.send_message(log_gid, log_text)
+                    except: pass
+            except Exception as e: 
+                await event.respond(f"❌ **فشل التنفيذ:** `{e}`")
+
+        # 3. الأوامر (الرفع والتنزيل)
+        if cmd == "رفع":
+            rank_name = next((p for p in parts if p in rank_map), None)
+            if rank_name:
+                if sender_id != OWNER_ID and my_rank_val <= rank_map[rank_name]:
+                    return await event.respond("❌ لا تملك صلاحية لرفع هذه الرتبة.")
+                for gid in ALLOWED_GROUPS: db.set_rank(str(gid), target_id, rank_name)
+                return await event.respond(f"👑 **| 👑 إرادة مـلـكـيـة سـامـيـة 👑**\n━━━━━━━━━━━━━━\n📝 **الـقـرار:** تـرقيـة مـسـتـخـدم\n👤 **الـمـسـتـفيد:** {t_name}\n🎖️ **الـرتبـة الـجـديـدة:** {rank_name}\n━━━━━━━━━━━━━━")
+
+        elif cmd == "تنزيل":
+            if sender_id != OWNER_ID and my_rank_val <= target_rank_val:
+                return await event.respond("❌ لا يمكنك تنزيل من هو برتبتك أو أعلى منك.")
+            for gid in ALLOWED_GROUPS: db.set_rank(str(gid), target_id, "عضو")
+            return await event.respond(f"👑 **| 👑 قـرار إعـفـاء إداري 👑**\n━━━━━━━━━━━━━━\n📝 **الـقـرار:** سـحب الـصـلاحـيات\n👤 **الـمـسـتـخدم:** {t_name}\n📉 **الـرتبـة:** عـضـو\n━━━━━━━━━━━━━━")
+
+        # 4. أوامر العقوبات
+        elif cmd == "انذار":
+            w_count = db.add_warn(chat_id, target_id)
+            if w_count >= 3:
+                db.reset_warns(chat_id, target_id)
+                await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=True), "كتم تلقائي (3 إنذارات)")
+            else:
+                await event.respond(f"⚠️ **إنذار ملكي!**\nالعضو: {t_name}\nعدد إنذاراته الآن: {w_count}/3")
+        
+        elif cmd_2nd == "رفع انذار":
+            db.reset_warns(chat_id, target_id)
+            await event.respond(f"✅ تم تصفير إنذارات {t_name}.")
+        elif cmd == "حظر":
+            await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=True), "حظر نهائي")
+        elif cmd == "طرد":
+            await apply_penalty(target_id, None, "طرد من المجموعة", is_kick=True)
         elif cmd == "كتم":
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=True), "كتم ملكي")
-
-        # --- الأوامر التي سألت عنها ---
         elif cmd == "تقييد":
-            # التقييد هنا يمنع إرسال الميديا والروابط مع السماح بالكلام (نص فقط)
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_media=True, send_stickers=True, send_gifs=True, embed_links=True), "تقييد الوسائط")
-
         elif cmd_2nd in ["رفع القيود", "فك التقييد", "الغاء التقييد"]:
-            # إعادة كافة الصلاحيات للعضو (كل القيم False تعني لا يوجد منع)
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=False, send_messages=False, send_media=False, send_stickers=False, send_gifs=False, embed_links=False), "رفع كافة القيود")
-
         elif cmd_2nd in ["الغاء الحظر", "رفع الحظر", "فك الحظر"]:
             await apply_penalty(target_id, ChatBannedRights(until_date=None, view_messages=False), "رفع الحظر")
-
         elif cmd_2nd in ["الغاء الكتم", "رفع الكتم", "فك الكتم"]:
             await apply_penalty(target_id, ChatBannedRights(until_date=None, send_messages=False), "رفع الكتم")
             
