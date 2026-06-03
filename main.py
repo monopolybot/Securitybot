@@ -441,10 +441,15 @@ async def main_handler(event):
     # دمج أول كلمتين للتعرف على أوامر الفراغ (مثل: الغاء الكتم)
     cmd_2nd = f"{parts[0]} {parts[1]}" if len(parts) >= 2 else cmd
     target_id, target_user = await get_target_info(event, parts)
+    
     if target_id: 
         if target_id == OWNER_ID and sender_id != OWNER_ID:
-            
-            return 
+            return  # الـ return هنا مباشرة تحت الـ if بدون أسطر فارغة
+
+        # ابدأ السطر التالي هنا فوراً بنفس محاذاة الـ if الثانية
+        my_rank_val = db.get_rank_value(chat_id, sender_id)
+        # ... باقي كود النظام ...
+
         # بقية الأوامر تتبع شرط وجود target_id لكن خارج شرط الحصانة الملكية
         my_rank_val = db.get_rank_value(chat_id, sender_id)
         target_rank_val = db.get_rank_value(chat_id, target_id)
