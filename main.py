@@ -785,9 +785,16 @@ async def handle_notes_system(event):
     if not await check_privilege(event, "ادمن"): return
     text, sender_id = event.raw_text, event.sender_id
 
-    # --- نظام الحالات (تعديل أو حذف) ---
+    # --- 1. نظام الحالات (تعديل أو حذف ملاحظة) ---
     if sender_id in user_edit_state:
         state = user_edit_state[sender_id]
+        
+        # إضافة خيار الإلغاء لزيادة استقرار النظام
+        if text == "إلغاء":
+            del user_edit_state[sender_id]
+            await event.reply("🚫 **تم إلغاء العملية.**")
+            return
+
         if state["step"] == "wait_index":
             if state["action"] == "del":
                 res = manage_note("delete_by_index", (state["name"], text))
@@ -803,7 +810,7 @@ async def handle_notes_system(event):
             await event.reply("✅ **تم التعديل بنجاح.**" if res == "success" else "❌ **خطأ في التعديل.**")
             return
 
-    # --- الأوامر العادية ---
+    # --- 2. الأوامر العادية ---
     if text.startswith("تسجيل ملاحظة"):
         try:
             content_part = text.replace("تسجيل ملاحظة", "").strip()
@@ -826,6 +833,12 @@ async def handle_notes_system(event):
         buttons = [[Button.inline("⚙️ تعديل", f"edit_{name}"), Button.inline("🗑️ حذف", f"del_{name}")], [Button.inline("❌ إغلاق", "close")]]
         await event.reply(msg, buttons=buttons)
 
+    elif text.startswith("حذف ملاحظة"):
+        name = text.replace("حذف ملاحظة", "").strip()
+        res = manage_note("delete_all", name)
+        await event.reply(f"🗑️ **تم مسح الملف الملكي لـ:** {name}" if res == "success" else "❌ الاسم غير موجود.")
+
+# --- 3. معالج الأزرار ---
 @client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_") or d.startswith(b"del_")))
 async def edit_callback_handler(event):
     data = event.data.decode().split("_")
