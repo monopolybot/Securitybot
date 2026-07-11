@@ -777,7 +777,8 @@ async def handle_notes_commands(event):
     
 
 
-# --- [ نظام المفكرة الملكية المطور V3 - نظام الملفات الشخصية ] ---
+# --- [ نظام المفكرة الملكية المطور - نظام الحوار التفاعلي ] ---
+
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def handle_notes_system(event):
     if not await check_privilege(event, "ادمن"): return
@@ -785,55 +786,70 @@ async def handle_notes_system(event):
     text = event.raw_text
     sender_id = event.sender_id
 
-    # 1. تسجيل ملاحظة (إضافة للملف الشخصي)
+    # 1. تسجيل ملاحظة
     if text.startswith("تسجيل ملاحظة"):
         try:
             content_part = text.replace("تسجيل ملاحظة", "").strip()
             name, note = content_part.split(":")
-            # لن نتحقق من duplicate، سنمرر الإضافة مباشرة للنظام
             manage_note("add", (name.strip(), note.strip(), sender_id))
             await event.reply(f"✅ **تم الحفظ في السجل الملكي لـ:** {name.strip()}\n📝 **الملاحظة:** {note.strip()}")
         except ValueError:
             await event.reply("❌ **خطأ في التنسيق!**\nاكتب: `تسجيل ملاحظة الاسم : الملاحظة`")
 
-    # 2. عرض المفكرة (عرض قائمة الأسماء التي لها ملاحظات)
+    # 2. عرض المفكرة
     elif text == "عرض المفكرة":
         notes = manage_note("get_active")
         if not notes:
             return await event.reply("📜 **المفكرة الملكية فارغة حالياً.**")
-        
         report = f"👑 **سجل المفكرة الملكية**\n" + "—" * 20 + "\n"
-        # عرض الأسماء الموجودة في المفكرة
         unique_names = sorted(list(set([n[0] for n in notes])))
         for i, name in enumerate(unique_names, 1):
             report += f"{i}. 👤 **{name}**\n"
-        
         await event.reply(report, buttons=[[Button.inline("❌ إغلاق", "close")]])
 
-    # 3. بحث ملاحظة (فتح الملف الشخصي للعضو)
+    # 3. بحث ملاحظة (مع زر التعديل التفاعلي)
     elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
-        results = manage_note("search", name) # يجب أن تجلب كافة الملاحظات لهذا الاسم
+        results = manage_note("search", name)
         if not results:
             return await event.reply(f"🔍 **لا يوجد ملف مسجل باسم:** {name}")
         
         msg = f"👑 **ملف العضو الملكي: {name}**\n" + "—" * 20 + "\n"
         for i, r in enumerate(results, 1):
-            # r[1] الملاحظة, r[2] التاريخ
             msg += f"⚜️ {i}. {r[1]}\n📅 {r[2]}\n" + "—" * 10 + "\n"
         
-        await event.reply(msg, buttons=[[Button.inline("❌ إغلاق", "close")]])
+        # زر التعديل يمرر اسم العضو في بيانات الزر
+        buttons = [[Button.inline("⚙️ تعديل ملاحظة", f"edit_{name}")], [Button.inline("❌ إغلاق", "close")]]
+        await event.reply(msg, buttons=buttons)
 
-    # 4. حذف ملاحظة محددة أو مسح ملف (للتطوير المستقبلي)
+    # 4. حذف ملاحظة
     elif text.startswith("حذف ملاحظة"):
         name = text.replace("حذف ملاحظة", "").strip()
-        res = manage_note("delete_all", name) # سيقوم بحذف كافة ملاحظات العضو
+        res = manage_note("delete_all", name)
         await event.reply(f"🗑️ **تم مسح الملف الملكي لـ:** {name}" if res == "success" else "❌ الاسم غير موجود.")
 
-    # 5. أرشفة المفكرة
-    elif text == "مفكرة جديدة":
-        buttons = [[Button.inline("✅ أرشفة السجل", "confirm_archive"), Button.inline("❌ إلغاء", "close")]]
-        await event.reply("⚠️ **تنبيه:** هل تود أرشفة المفكرة الحالية وبدء سجلات جديدة؟", buttons=buttons)
+# --- [ معالج زر التعديل التفاعلي ] ---
+@client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_")))
+async def edit_callback_handler(event):
+    name = event.data.decode().replace("edit_", "")
+    
+    # استخدام الحوار لطلب البيانات من المشرف
+    async with client.conversation(event.sender_id) as conv:
+        await event.edit(f"👑 **تعديل ملف {name}**\nأرسل الآن **رقم الملاحظة**:")
+        response_idx = await conv.get_response()
+        note_index = response_idx.raw_text.strip()
+        
+        await event.respond("✍️ أرسل **الملاحظة الجديدة**:")
+        response_note = await conv.get_response()
+        new_note = response_note.raw_text.strip()
+        
+        # استدعاء دالة التعديل (تأكد أن الدالة موجودة في notes_manager.py)
+        res = manage_note("edit_by_index", (name, note_index, new_note))
+        
+        if res == "success":
+            await event.respond(f"✅ **تم تحديث الملاحظة ({note_index}) لـ {name} بنجاح.**")
+        else:
+            await event.respond("❌ **خطأ:** رقم الملاحظة غير صحيح.")
 
     
     
