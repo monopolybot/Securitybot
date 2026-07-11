@@ -789,13 +789,17 @@ async def handle_notes_system(event):
     if sender_id in user_edit_state:
         state = user_edit_state[sender_id]
         
-        # إضافة خيار الإلغاء لزيادة استقرار النظام
         if text == "إلغاء":
             del user_edit_state[sender_id]
             await event.reply("🚫 **تم إلغاء العملية.**")
             return
 
         if state["step"] == "wait_index":
+            # إضافة شرط الحماية من الأخطاء (يجب أن يكون المدخل رقماً)
+            if not text.isdigit():
+                await event.reply("❌ **خطأ:** يرجى إرسال **رقم الملاحظة** فقط.")
+                return
+                
             if state["action"] == "del":
                 res = manage_note("delete_by_index", (state["name"], text))
                 del user_edit_state[sender_id]
@@ -804,6 +808,7 @@ async def handle_notes_system(event):
                 user_edit_state[sender_id].update({"index": text, "step": "wait_note"})
                 await event.reply("✍️ **تم استلام الرقم.**\nالآن أرسل **الملاحظة الجديدة**:")
             return
+            
         elif state["step"] == "wait_note":
             res = manage_note("edit_by_index", (state["name"], state["index"], text))
             del user_edit_state[sender_id]
@@ -825,12 +830,12 @@ async def handle_notes_system(event):
         report = "👑 **سجل المفكرة:**\n" + "\n".join([f"{i}. 👤 {n[0]}" for i, n in enumerate(notes, 1)])
         await event.reply(report, buttons=[[Button.inline("❌ إغلاق", "close")]])
 
-        elif text.startswith("بحث ملاحظة"):
+    # تم تصحيح الإزاحة هنا لتكون على نفس مستوى الـ elif السابقة
+    elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
         results = manage_note("search", name)
         if not results: return await event.reply("🔍 **لا يوجد ملف.**")
         
-        # التعديل هنا: تم إضافة {r[2]} لعرض التاريخ والوقت بتوقيت الأردن
         msg = f"👑 **ملف العضو: {name}**\n\n" + "\n".join(
             [f"⚜️ {i}. {r[1]} \n   ⏳ *{r[2]}*\n" for i, r in enumerate(results, 1)]
         )
@@ -840,7 +845,6 @@ async def handle_notes_system(event):
             [Button.inline("❌ إغلاق", "close")]
         ]
         await event.reply(msg, buttons=buttons)
-
 
     elif text.startswith("حذف ملاحظة"):
         name = text.replace("حذف ملاحظة", "").strip()
