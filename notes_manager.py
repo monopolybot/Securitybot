@@ -1,9 +1,9 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DB_NAME = "monopoly_notes.db"
 
-# دالة لتهيئة قاعدة البيانات (تمت إضافتها لحل الخطأ)
+# دالة لتهيئة قاعدة البيانات
 def init_notes_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -22,10 +22,13 @@ def manage_note(action, data=None):
     cursor = conn.cursor()
     res = None
     
+    # حساب توقيت الأردن (UTC + 3 ساعات)
+    amman_time = (datetime.utcnow() + timedelta(hours=3)).strftime("%Y-%m-%d %H:%M")
+    
     if action == "add":
         name, content, admin_id = data
         cursor.execute("INSERT INTO admin_notes (member_name, note_content, admin_id, date_added) VALUES (?, ?, ?, ?)", 
-                       (name, content, admin_id, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                       (name, content, admin_id, amman_time))
         res = "success"
 
     elif action == "get_active":
