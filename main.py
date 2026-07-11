@@ -780,7 +780,6 @@ async def handle_notes_commands(event):
 
 user_edit_state = {}
 
-# --- دالة عرض صفحة المفكرة (جديدة ومدمجة) ---
 async def send_notes_page(event, notes, page):
     page_size = 5
     total_pages = (len(notes) + page_size - 1) // page_size
@@ -799,8 +798,12 @@ async def send_notes_page(event, notes, page):
     if nav_buttons: buttons.append(nav_buttons)
     buttons.append([Button.inline("❌ إغلاق", "close")])
     
-    if hasattr(event, 'edit'): await event.edit(report, buttons=buttons)
-    else: await event.reply(report, buttons=buttons)
+    # الحل: إذا كان الحدث عبارة عن ضغطة زر (CallbackQuery) نستخدم edit
+    # إذا كان أمراً جديداً (NewMessage) نستخدم reply
+    if isinstance(event, events.CallbackQuery.Event):
+        await event.edit(report, buttons=buttons)
+    else:
+        await event.reply(report, buttons=buttons)
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def handle_notes_system(event):
