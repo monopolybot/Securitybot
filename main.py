@@ -774,103 +774,68 @@ client.loop.create_task(hourly_royal_broadcast())
 async def handle_notes_commands(event):
     if not await check_privilege(event, "ادمن"): return
     text = event.raw_text
+    
 
-# --- [ نظام المفكرة الملكية المطور V2 - مع الأزرار ] ---
+
+# --- [ نظام المفكرة الملكية المطور V3 - نظام الملفات الشخصية ] ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def handle_notes_system(event):
     if not await check_privilege(event, "ادمن"): return
     
     text = event.raw_text
-    chat_id = event.chat_id
     sender_id = event.sender_id
 
-    # 1. تسجيل ملاحظة (الاسم : الملاحظة)
+    # 1. تسجيل ملاحظة (إضافة للملف الشخصي)
     if text.startswith("تسجيل ملاحظة"):
         try:
             content_part = text.replace("تسجيل ملاحظة", "").strip()
             name, note = content_part.split(":")
-            res = manage_note("add", (name.strip(), note.strip(), sender_id))
-            if res == "duplicate":
-                await event.reply(f"⚠️ **تنبيه:** الاسم ({name.strip()}) مسجل مسبقاً في المفكرة الحالية!")
-            else:
-                await event.reply(f"✅ **تم الحفظ:** سجلت ملاحظة لـ {name.strip()}")
+            # لن نتحقق من duplicate، سنمرر الإضافة مباشرة للنظام
+            manage_note("add", (name.strip(), note.strip(), sender_id))
+            await event.reply(f"✅ **تم الحفظ في السجل الملكي لـ:** {name.strip()}\n📝 **الملاحظة:** {note.strip()}")
         except ValueError:
-            await event.reply("❌ **خطأ في التنسيق!**\nاكتب: تسجيل ملاحظة الاسم : الملاحظة")
+            await event.reply("❌ **خطأ في التنسيق!**\nاكتب: `تسجيل ملاحظة الاسم : الملاحظة`")
 
-    
-    # 2. عرض المفكرة (بنظام الصفحات والأزرار)
+    # 2. عرض المفكرة (عرض قائمة الأسماء التي لها ملاحظات)
     elif text == "عرض المفكرة":
         notes = manage_note("get_active")
         if not notes:
-            return await event.reply("📜 **المفكرة الحالية فارغة.**")
+            return await event.reply("📜 **المفكرة الملكية فارغة حالياً.**")
         
-        # إعداد الصفحة الأولى (أول 5 ملاحظات)
-        total_notes = len(notes)
-        first_page = notes[:5]
+        report = f"👑 **سجل المفكرة الملكية**\n" + "—" * 20 + "\n"
+        # عرض الأسماء الموجودة في المفكرة
+        unique_names = sorted(list(set([n[0] for n in notes])))
+        for i, name in enumerate(unique_names, 1):
+            report += f"{i}. 👤 **{name}**\n"
         
-        report = f"👑 **المفكرة الملكية الحالية** ({total_notes})\n" + "—" * 15 + "\n"
-        for i, n in enumerate(first_page, 1):
-            report += f"{i}. 👤 **{n[0]}**: {n[1]}\n"
-        
-        # إذا كان هناك أكثر من 5 ملاحظات، نضع زر "التالي"
-        buttons = []
-        if total_notes > 5:
-            buttons = [[Button.inline("التالي ◀️", "note_page_1")]]
-        
-        # إضافة زر إغلاق دائماً
-        buttons.append([Button.inline("❌ إغلاق", "close")])
-        
-        await event.reply(report, buttons=buttons)
-        
+        await event.reply(report, buttons=[[Button.inline("❌ إغلاق", "close")]])
 
-    # 3. تعديل ملاحظة
-    elif text.startswith("تعديل ملاحظة"):
-        try:
-            content_part = text.replace("تعديل ملاحظة", "").strip()
-            name, new_note = content_part.split(":")
-            res = manage_note("edit", (name.strip(), new_note.strip()))
-            await event.reply(f"✅ تم تحديث ملاحظة {name.strip()}." if res == "success" else "❌ الاسم غير موجود بالنشط.")
-        except ValueError:
-            await event.reply("❌ اكتب: تعديل ملاحظة الاسم : الملاحظة الجديدة")
-
-    # 4. حذف ملاحظة
-    elif text.startswith("حذف ملاحظة"):
-        name = text.replace("حذف ملاحظة", "").strip()
-        res = manage_note("delete", name)
-        await event.reply(f"🗑️ تم حذف ملاحظة {name}." if res == "success" else "❌ الاسم غير موجود.")
-
-    # 5. بحث ذكي (مرقم ويعطي الحالة)
+    # 3. بحث ملاحظة (فتح الملف الشخصي للعضو)
     elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
-        results = manage_note("search", name)
+        results = manage_note("search", name) # يجب أن تجلب كافة الملاحظات لهذا الاسم
         if not results:
-            return await event.reply(f"🔍 لا توجد سجلات مطابقة لـ: {name}")
+            return await event.reply(f"🔍 **لا يوجد ملف مسجل باسم:** {name}")
         
-        msg = f"🔍 **نتائج البحث الملكي لـ: {name}**\n" + "—" * 15 + "\n"
+        msg = f"👑 **ملف العضو الملكي: {name}**\n" + "—" * 20 + "\n"
         for i, r in enumerate(results, 1):
-            status = "✅ حالي" if r[3] == "active" else "📁 أرشيف"
-            msg += f"{i}. 👤 **{r[0]}**: {r[1]}\n📅 {r[2]} | {status}\n" + "—" * 8 + "\n"
-        await event.reply(msg)
+            # r[1] الملاحظة, r[2] التاريخ
+            msg += f"⚜️ {i}. {r[1]}\n📅 {r[2]}\n" + "—" * 10 + "\n"
+        
+        await event.reply(msg, buttons=[[Button.inline("❌ إغلاق", "close")]])
 
-    # 6. أرشفة (تصفير وبدء سجل جديد)
+    # 4. حذف ملاحظة محددة أو مسح ملف (للتطوير المستقبلي)
+    elif text.startswith("حذف ملاحظة"):
+        name = text.replace("حذف ملاحظة", "").strip()
+        res = manage_note("delete_all", name) # سيقوم بحذف كافة ملاحظات العضو
+        await event.reply(f"🗑️ **تم مسح الملف الملكي لـ:** {name}" if res == "success" else "❌ الاسم غير موجود.")
+
+    # 5. أرشفة المفكرة
     elif text == "مفكرة جديدة":
-        # إضافة زر تأكيد لعدم الحذف بالخطأ
-        buttons = [
-            [Button.inline("✅ نعم، أرشف الحالية", "confirm_archive"), Button.inline("❌ إلغاء", "close")]
-        ]
-        await event.reply("⚠️ **تنبيه:** هل أنت متأكد من أرشفة المفكرة الحالية وبدء واحدة جديدة؟", buttons=buttons)
+        buttons = [[Button.inline("✅ أرشفة السجل", "confirm_archive"), Button.inline("❌ إلغاء", "close")]]
+        await event.reply("⚠️ **تنبيه:** هل تود أرشفة المفكرة الحالية وبدء سجلات جديدة؟", buttons=buttons)
 
-    # 7. عرض ملاحظات تاريخ معين
-    elif text.startswith("ملاحظات تاريخ"):
-        date_query = text.replace("ملاحظات تاريخ", "").strip()
-        results = manage_note("get_by_date", date_query)
-        if not results:
-            return await event.reply(f"📅 لا توجد سجلات بتاريخ {date_query}\n(التنسيق المطلوب: YYYY-MM-DD)")
-        
-        msg = f"📜 **سجل الملاحظات يوم {date_query}**\n" + "—" * 15 + "\n"
-        for i, r in enumerate(results, 1):
-            msg += f"{i}. 👤 **{r[0]}**: {r[1]}\n"
-        await event.reply(msg)
+    
     
 
 # بدء التشغيل النهائي
