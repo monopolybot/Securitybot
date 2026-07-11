@@ -825,13 +825,22 @@ async def handle_notes_system(event):
         report = "👑 **سجل المفكرة:**\n" + "\n".join([f"{i}. 👤 {n[0]}" for i, n in enumerate(notes, 1)])
         await event.reply(report, buttons=[[Button.inline("❌ إغلاق", "close")]])
 
-    elif text.startswith("بحث ملاحظة"):
+        elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
         results = manage_note("search", name)
         if not results: return await event.reply("🔍 **لا يوجد ملف.**")
-        msg = f"👑 **ملف العضو: {name}**\n" + "\n".join([f"⚜️ {i}. {r[1]}" for i, r in enumerate(results, 1)])
-        buttons = [[Button.inline("⚙️ تعديل", f"edit_{name}"), Button.inline("🗑️ حذف", f"del_{name}")], [Button.inline("❌ إغلاق", "close")]]
+        
+        # التعديل هنا: تم إضافة {r[2]} لعرض التاريخ والوقت بتوقيت الأردن
+        msg = f"👑 **ملف العضو: {name}**\n\n" + "\n".join(
+            [f"⚜️ {i}. {r[1]} \n   ⏳ *{r[2]}*\n" for i, r in enumerate(results, 1)]
+        )
+        
+        buttons = [
+            [Button.inline("⚙️ تعديل", f"edit_{name}"), Button.inline("🗑️ حذف", f"del_{name}")], 
+            [Button.inline("❌ إغلاق", "close")]
+        ]
         await event.reply(msg, buttons=buttons)
+
 
     elif text.startswith("حذف ملاحظة"):
         name = text.replace("حذف ملاحظة", "").strip()
