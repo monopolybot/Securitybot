@@ -19,31 +19,31 @@ def init_notes_db():
 def manage_note(action, data=None):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    res = None
     
     if action == "add":
         name, content, admin_id = data
-        cursor.execute("SELECT * FROM admin_notes WHERE member_name = ? AND status = 'active'", (name,))
-        if cursor.fetchone():
-            conn.close()
-            return "duplicate"
+        # تم إزالة شرط الـ duplicate للسماح بتكرار الملاحظات لنفس العضو
         cursor.execute("INSERT INTO admin_notes (member_name, note_content, admin_id, date_added) VALUES (?, ?, ?, ?)", 
                        (name, content, admin_id, datetime.now().strftime("%Y-%m-%d %H:%M")))
         conn.commit()
         res = "success"
 
     elif action == "get_active":
-        cursor.execute("SELECT member_name, note_content, date_added FROM admin_notes WHERE status = 'active' ORDER BY id ASC")
+        # لجلب قائمة فريدة بالأسماء النشطة
+        cursor.execute("SELECT member_name FROM admin_notes WHERE status = 'active' GROUP BY member_name")
         res = cursor.fetchall()
 
-    elif action == "edit":
-        name, new_content = data
-        cursor.execute("UPDATE admin_notes SET note_content = ? WHERE member_name = ? AND status = 'active'", (new_content, name))
-        conn.commit()
-        res = "success" if cursor.rowcount > 0 else "not_found"
-
-    elif action == "delete":
+    elif action == "search":
+        # لجلب كافة الملاحظات لهذا الاسم (تم تعديلها لجلب كل شيء)
         name = data
-        cursor.execute("DELETE FROM admin_notes WHERE member_name = ? AND status = 'active'", (name,))
+        cursor.execute("SELECT member_name, note_content, date_added, status FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
+        res = cursor.fetchall()
+
+    elif action == "delete_all":
+        # حذف كافة ملاحظات العضو المسجلة
+        name = data
+        cursor.execute("DELETE FROM admin_notes WHERE member_name = ?", (name,))
         conn.commit()
         res = "success" if cursor.rowcount > 0 else "not_found"
 
@@ -51,16 +51,6 @@ def manage_note(action, data=None):
         cursor.execute("UPDATE admin_notes SET status = 'archived' WHERE status = 'active'")
         conn.commit()
         res = "success"
-
-    elif action == "search":
-        name = data
-        cursor.execute("SELECT member_name, note_content, date_added, status FROM admin_notes WHERE member_name LIKE ? ORDER BY date_added DESC", (f"%{name}%",))
-        res = cursor.fetchall()
-
-    elif action == "get_by_date":
-        date_str = data # YYYY-MM-DD
-        cursor.execute("SELECT member_name, note_content, status FROM admin_notes WHERE date_added LIKE ?", (f"{date_str}%",))
-        res = cursor.fetchall()
 
     conn.close()
     return res
