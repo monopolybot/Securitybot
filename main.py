@@ -780,6 +780,28 @@ async def handle_notes_commands(event):
 
 user_edit_state = {}
 
+# --- دالة عرض صفحة المفكرة (جديدة ومدمجة) ---
+async def send_notes_page(event, notes, page):
+    page_size = 5
+    total_pages = (len(notes) + page_size - 1) // page_size
+    start = page * page_size
+    end = start + page_size
+    page_notes = notes[start:end]
+    
+    report = f"👑 **سجل المفكرة (صفحة {page + 1}/{total_pages}):**\n\n"
+    report += "\n".join([f"{start + i + 1}. 👤 {n[0]}" for i, n in enumerate(page_notes)])
+    
+    buttons = []
+    nav_buttons = []
+    if page > 0: nav_buttons.append(Button.inline("⏪ رجوع", f"page_{page-1}"))
+    if page < total_pages - 1: nav_buttons.append(Button.inline("التالي ⏩", f"page_{page+1}"))
+    
+    if nav_buttons: buttons.append(nav_buttons)
+    buttons.append([Button.inline("❌ إغلاق", "close")])
+    
+    if hasattr(event, 'edit'): await event.edit(report, buttons=buttons)
+    else: await event.reply(report, buttons=buttons)
+
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def handle_notes_system(event):
     if not await check_privilege(event, "ادمن"): return
@@ -788,18 +810,15 @@ async def handle_notes_system(event):
     # --- 1. نظام الحالات (تعديل أو حذف ملاحظة) ---
     if sender_id in user_edit_state:
         state = user_edit_state[sender_id]
-        
         if text == "إلغاء":
             del user_edit_state[sender_id]
             await event.reply("🚫 **تم إلغاء العملية.**")
             return
 
         if state["step"] == "wait_index":
-            # إضافة شرط الحماية من الأخطاء (يجب أن يكون المدخل رقماً)
             if not text.isdigit():
                 await event.reply("❌ **خطأ:** يرجى إرسال **رقم الملاحظة** فقط.")
                 return
-                
             if state["action"] == "del":
                 res = manage_note("delete_by_index", (state["name"], text))
                 del user_edit_state[sender_id]
@@ -808,7 +827,6 @@ async def handle_notes_system(event):
                 user_edit_state[sender_id].update({"index": text, "step": "wait_note"})
                 await event.reply("✍️ **تم استلام الرقم.**\nالآن أرسل **الملاحظة الجديدة**:")
             return
-            
         elif state["step"] == "wait_note":
             res = manage_note("edit_by_index", (state["name"], state["index"], text))
             del user_edit_state[sender_id]
@@ -827,23 +845,16 @@ async def handle_notes_system(event):
     elif text == "عرض المفكرة":
         notes = manage_note("get_active")
         if not notes: return await event.reply("📜 **المفكرة فارغة.**")
-        report = "👑 **سجل المفكرة:**\n" + "\n".join([f"{i}. 👤 {n[0]}" for i, n in enumerate(notes, 1)])
-        await event.reply(report, buttons=[[Button.inline("❌ إغلاق", "close")]])
+        await send_notes_page(event, notes, 0)
 
-    # تم تصحيح الإزاحة هنا لتكون على نفس مستوى الـ elif السابقة
     elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
         results = manage_note("search", name)
         if not results: return await event.reply("🔍 **لا يوجد ملف.**")
-        
         msg = f"👑 **ملف العضو: {name}**\n\n" + "\n".join(
             [f"⚜️ {i}. {r[1]} \n   ⏳ *{r[2]}*\n" for i, r in enumerate(results, 1)]
         )
-        
-        buttons = [
-            [Button.inline("⚙️ تعديل", f"edit_{name}"), Button.inline("🗑️ حذف", f"del_{name}")], 
-            [Button.inline("❌ إغلاق", "close")]
-        ]
+        buttons = [[Button.inline("⚙️ تعديل", f"edit_{name}"), Button.inline("🗑️ حذف", f"del_{name}")], [Button.inline("❌ إغلاق", "close")]]
         await event.reply(msg, buttons=buttons)
 
     elif text.startswith("حذف ملاحظة"):
@@ -851,13 +862,18 @@ async def handle_notes_system(event):
         res = manage_note("delete_all", name)
         await event.reply(f"🗑️ **تم مسح الملف الملكي لـ:** {name}" if res == "success" else "❌ الاسم غير موجود.")
 
-# --- 3. معالج الأزرار ---
-@client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_") or d.startswith(b"del_")))
-async def edit_callback_handler(event):
-    data = event.data.decode().split("_")
-    action, name = data[0], data[1]
-    user_edit_state[event.sender_id] = {"name": name, "action": action, "step": "wait_index"}
-    await event.edit(f"👑 **{action.upper()} ملاحظة للعضو {name}**\nأرسل الآن **رقم الملاحظة**:")
+# --- 3. معالج الأزرار (تعديل + حذف + تنقل) ---
+@client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_") or d.startswith(b"del_") or d.startswith(b"page_")))
+async def callback_handler(event):
+    data = event.data.decode()
+    if data.startswith("page_"):
+        page = int(data.split("_")[1])
+        notes = manage_note("get_active")
+        await send_notes_page(event, notes, page)
+    else:
+        action, name = data.split("_")
+        user_edit_state[event.sender_id] = {"name": name, "action": action, "step": "wait_index"}
+        await event.edit(f"👑 **{action.upper()} ملاحظة للعضو {name}**\nأرسل الآن **رقم الملاحظة**:")
 
     
     
