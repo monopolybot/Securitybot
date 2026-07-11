@@ -777,7 +777,9 @@ async def handle_notes_commands(event):
     
 
 
-# --- [ نظام المفكرة الملكية المطور - نظام الحوار التفاعلي ] ---
+
+# قاموس لتخزين حالة التعديل لكل مستخدم
+user_edit_state = {}
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def handle_notes_system(event):
@@ -786,50 +788,72 @@ async def handle_notes_system(event):
     text = event.raw_text
     sender_id = event.sender_id
 
-    # 1. تسجيل ملاحظة
+    # --- معالجة الحوار (الخطوات) ---
+    if sender_id in user_edit_state:
+        state = user_edit_state[sender_id]
+        
+        # الخطوة 1: استلام رقم الملاحظة
+        if state["step"] == "wait_index":
+            user_edit_state[sender_id]["index"] = text
+            user_edit_state[sender_id]["step"] = "wait_note"
+            await event.reply("✍️ **تم استلام الرقم.**\nالآن أرسل **الملاحظة الجديدة**:")
+            return
+
+        # الخطوة 2: استلام الملاحظة الجديدة والتنفيذ
+        elif state["step"] == "wait_note":
+            name = state["name"]
+            index = state["index"]
+            res = manage_note("edit_by_index", (name, index, text))
+            del user_edit_state[sender_id] # حذف الحالة
+            
+            if res == "success":
+                await event.reply(f"✅ **تم تحديث الملاحظة ({index}) لـ {name} بنجاح.**")
+            else:
+                await event.reply("❌ **خطأ:** رقم الملاحظة غير صحيح أو غير موجود.")
+            return
+
+    # --- الأوامر العادية ---
     if text.startswith("تسجيل ملاحظة"):
         try:
             content_part = text.replace("تسجيل ملاحظة", "").strip()
             name, note = content_part.split(":")
             manage_note("add", (name.strip(), note.strip(), sender_id))
-            await event.reply(f"✅ **تم الحفظ في السجل الملكي لـ:** {name.strip()}\n📝 **الملاحظة:** {note.strip()}")
+            await event.reply(f"✅ **تم الحفظ في السجل الملكي لـ:** {name.strip()}")
         except ValueError:
             await event.reply("❌ **خطأ في التنسيق!**\nاكتب: `تسجيل ملاحظة الاسم : الملاحظة`")
 
-    # 2. عرض المفكرة
     elif text == "عرض المفكرة":
         notes = manage_note("get_active")
-        if not notes:
-            return await event.reply("📜 **المفكرة الملكية فارغة حالياً.**")
+        if not notes: return await event.reply("📜 **المفكرة الملكية فارغة.**")
         report = f"👑 **سجل المفكرة الملكية**\n" + "—" * 20 + "\n"
         unique_names = sorted(list(set([n[0] for n in notes])))
-        for i, name in enumerate(unique_names, 1):
-            report += f"{i}. 👤 **{name}**\n"
+        for i, name in enumerate(unique_names, 1): report += f"{i}. 👤 **{name}**\n"
         await event.reply(report, buttons=[[Button.inline("❌ إغلاق", "close")]])
 
-    # 3. بحث ملاحظة (مع زر التعديل التفاعلي)
     elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
         results = manage_note("search", name)
-        if not results:
-            return await event.reply(f"🔍 **لا يوجد ملف مسجل باسم:** {name}")
-        
+        if not results: return await event.reply(f"🔍 **لا يوجد ملف مسجل باسم:** {name}")
         msg = f"👑 **ملف العضو الملكي: {name}**\n" + "—" * 20 + "\n"
-        for i, r in enumerate(results, 1):
-            msg += f"⚜️ {i}. {r[1]}\n📅 {r[2]}\n" + "—" * 10 + "\n"
-        
-        # زر التعديل يمرر اسم العضو في بيانات الزر
+        for i, r in enumerate(results, 1): msg += f"⚜️ {i}. {r[1]}\n📅 {r[2]}\n" + "—" * 10 + "\n"
         buttons = [[Button.inline("⚙️ تعديل ملاحظة", f"edit_{name}")], [Button.inline("❌ إغلاق", "close")]]
         await event.reply(msg, buttons=buttons)
 
-    # 4. حذف ملاحظة
     elif text.startswith("حذف ملاحظة"):
         name = text.replace("حذف ملاحظة", "").strip()
         res = manage_note("delete_all", name)
         await event.reply(f"🗑️ **تم مسح الملف الملكي لـ:** {name}" if res == "success" else "❌ الاسم غير موجود.")
 
-# --- [ معالج زر التعديل التفاعلي ] ---
+# --- [ معالج زر التعديل ] ---
 @client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_")))
+async def edit_callback_handler(event):
+    name = event.data.decode().replace("edit_", "")
+    sender_id = event.sender_id
+    
+    # تفعيل وضع التعديل
+    user_edit_state[sender_id] = {"name": name, "step": "wait_index"}
+    await event.edit(f"👑 **تعديل ملف {name}**\nأرسل الآن **رقم الملاحظة**:")
+
 async def edit_callback_handler(event):
     name = event.data.decode().replace("edit_", "")
     
