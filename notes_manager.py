@@ -3,6 +3,20 @@ from datetime import datetime
 
 DB_NAME = "monopoly_notes.db"
 
+# دالة لتهيئة قاعدة البيانات (تمت إضافتها لحل الخطأ)
+def init_notes_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS admin_notes 
+                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                       member_name TEXT, 
+                       note_content TEXT, 
+                       admin_id INTEGER, 
+                       date_added TEXT,
+                       status TEXT DEFAULT 'active')''')
+    conn.commit()
+    conn.close()
+
 def manage_note(action, data=None):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
