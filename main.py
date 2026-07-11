@@ -778,38 +778,29 @@ async def handle_notes_commands(event):
 
 
 
-# قاموس لتخزين حالة التعديل لكل مستخدم
 user_edit_state = {}
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def handle_notes_system(event):
     if not await check_privilege(event, "ادمن"): return
-    
-    text = event.raw_text
-    sender_id = event.sender_id
+    text, sender_id = event.raw_text, event.sender_id
 
-    # --- معالجة الحوار (الخطوات) ---
+    # --- نظام الحالات (تعديل أو حذف) ---
     if sender_id in user_edit_state:
         state = user_edit_state[sender_id]
-        
-        # الخطوة 1: استلام رقم الملاحظة
         if state["step"] == "wait_index":
-            user_edit_state[sender_id]["index"] = text
-            user_edit_state[sender_id]["step"] = "wait_note"
-            await event.reply("✍️ **تم استلام الرقم.**\nالآن أرسل **الملاحظة الجديدة**:")
-            return
-
-        # الخطوة 2: استلام الملاحظة الجديدة والتنفيذ
-        elif state["step"] == "wait_note":
-            name = state["name"]
-            index = state["index"]
-            res = manage_note("edit_by_index", (name, index, text))
-            del user_edit_state[sender_id] # حذف الحالة
-            
-            if res == "success":
-                await event.reply(f"✅ **تم تحديث الملاحظة ({index}) لـ {name} بنجاح.**")
+            if state["action"] == "del":
+                res = manage_note("delete_by_index", (state["name"], text))
+                del user_edit_state[sender_id]
+                await event.reply("✅ **تم الحذف بنجاح.**" if res == "success" else "❌ **خطأ:** رقم الملاحظة غير صحيح.")
             else:
-                await event.reply("❌ **خطأ:** رقم الملاحظة غير صحيح أو غير موجود.")
+                user_edit_state[sender_id].update({"index": text, "step": "wait_note"})
+                await event.reply("✍️ **تم استلام الرقم.**\nالآن أرسل **الملاحظة الجديدة**:")
+            return
+        elif state["step"] == "wait_note":
+            res = manage_note("edit_by_index", (state["name"], state["index"], text))
+            del user_edit_state[sender_id]
+            await event.reply("✅ **تم التعديل بنجاح.**" if res == "success" else "❌ **خطأ في التعديل.**")
             return
 
     # --- الأوامر العادية ---
@@ -818,62 +809,29 @@ async def handle_notes_system(event):
             content_part = text.replace("تسجيل ملاحظة", "").strip()
             name, note = content_part.split(":")
             manage_note("add", (name.strip(), note.strip(), sender_id))
-            await event.reply(f"✅ **تم الحفظ في السجل الملكي لـ:** {name.strip()}")
-        except ValueError:
-            await event.reply("❌ **خطأ في التنسيق!**\nاكتب: `تسجيل ملاحظة الاسم : الملاحظة`")
+            await event.reply(f"✅ **تم الحفظ:** {name.strip()}")
+        except: await event.reply("❌ **خطأ في التنسيق.**")
 
     elif text == "عرض المفكرة":
         notes = manage_note("get_active")
-        if not notes: return await event.reply("📜 **المفكرة الملكية فارغة.**")
-        report = f"👑 **سجل المفكرة الملكية**\n" + "—" * 20 + "\n"
-        unique_names = sorted(list(set([n[0] for n in notes])))
-        for i, name in enumerate(unique_names, 1): report += f"{i}. 👤 **{name}**\n"
+        if not notes: return await event.reply("📜 **المفكرة فارغة.**")
+        report = "👑 **سجل المفكرة:**\n" + "\n".join([f"{i}. 👤 {n[0]}" for i, n in enumerate(notes, 1)])
         await event.reply(report, buttons=[[Button.inline("❌ إغلاق", "close")]])
 
     elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
         results = manage_note("search", name)
-        if not results: return await event.reply(f"🔍 **لا يوجد ملف مسجل باسم:** {name}")
-        msg = f"👑 **ملف العضو الملكي: {name}**\n" + "—" * 20 + "\n"
-        for i, r in enumerate(results, 1): msg += f"⚜️ {i}. {r[1]}\n📅 {r[2]}\n" + "—" * 10 + "\n"
-        buttons = [[Button.inline("⚙️ تعديل ملاحظة", f"edit_{name}")], [Button.inline("❌ إغلاق", "close")]]
+        if not results: return await event.reply("🔍 **لا يوجد ملف.**")
+        msg = f"👑 **ملف العضو: {name}**\n" + "\n".join([f"⚜️ {i}. {r[1]}" for i, r in enumerate(results, 1)])
+        buttons = [[Button.inline("⚙️ تعديل", f"edit_{name}"), Button.inline("🗑️ حذف", f"del_{name}")], [Button.inline("❌ إغلاق", "close")]]
         await event.reply(msg, buttons=buttons)
 
-    elif text.startswith("حذف ملاحظة"):
-        name = text.replace("حذف ملاحظة", "").strip()
-        res = manage_note("delete_all", name)
-        await event.reply(f"🗑️ **تم مسح الملف الملكي لـ:** {name}" if res == "success" else "❌ الاسم غير موجود.")
-
-# --- [ معالج زر التعديل ] ---
-@client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_")))
+@client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_") or d.startswith(b"del_")))
 async def edit_callback_handler(event):
-    name = event.data.decode().replace("edit_", "")
-    sender_id = event.sender_id
-    
-    # تفعيل وضع التعديل
-    user_edit_state[sender_id] = {"name": name, "step": "wait_index"}
-    await event.edit(f"👑 **تعديل ملف {name}**\nأرسل الآن **رقم الملاحظة**:")
-
-async def edit_callback_handler(event):
-    name = event.data.decode().replace("edit_", "")
-    
-    # استخدام الحوار لطلب البيانات من المشرف
-    async with client.conversation(event.sender_id) as conv:
-        await event.edit(f"👑 **تعديل ملف {name}**\nأرسل الآن **رقم الملاحظة**:")
-        response_idx = await conv.get_response()
-        note_index = response_idx.raw_text.strip()
-        
-        await event.respond("✍️ أرسل **الملاحظة الجديدة**:")
-        response_note = await conv.get_response()
-        new_note = response_note.raw_text.strip()
-        
-        # استدعاء دالة التعديل (تأكد أن الدالة موجودة في notes_manager.py)
-        res = manage_note("edit_by_index", (name, note_index, new_note))
-        
-        if res == "success":
-            await event.respond(f"✅ **تم تحديث الملاحظة ({note_index}) لـ {name} بنجاح.**")
-        else:
-            await event.respond("❌ **خطأ:** رقم الملاحظة غير صحيح.")
+    data = event.data.decode().split("_")
+    action, name = data[0], data[1]
+    user_edit_state[event.sender_id] = {"name": name, "action": action, "step": "wait_index"}
+    await event.edit(f"👑 **{action.upper()} ملاحظة للعضو {name}**\nأرسل الآن **رقم الملاحظة**:")
 
     
     
