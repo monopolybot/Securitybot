@@ -30,7 +30,7 @@ ALLOWED_GROUPS = [
 BAD_WORDS = ["كلمة1", "كلمة2", "سكس", "إباحي", "زب", "كس", "طيز" ,"sex" ,"fuck" ,"dick" ,"pussy" ,"تنتاك", "إباحيه", "اباحيه", "إباحية", "اباحية", "خنيث", "مخنث", "زنوة", "عير", "فحل", "هالشرموطة", "هالشرموطه", "سكـس", "تعارف", "بزازك", "بز", "لحس", "مص", "زبر", "تمصيلي", "الحسلك", "انيك", "تنتاكي", "انيكك", "قحبة", "قحبه", "شرموطة", "شرموط", "شرموطه", "منيك", "منيوك", "تتناك", "منتاك", "منتاكة", "منتاكه", "كحب", "كحبة", "كحبه", "زبي", "زوبري", "زوبي", "عرص", "كسمك", "كوساومك", "كوس", "خول", "اير", "ايري", "سالب", "ديوث", "سحاقيه", "متناكه", "متناكة", "متناك", "سحاقية", "طيزك"] 
 
 # تشغيل العميل (Client) - تم تحديث اسم الجلسة لنسخة V9 الملكية لضمان جلب الآيديات
-client = TelegramClient('Monopoly_Royal_Session_V9', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+client = TelegramClient('Monopoly_Royal_Session_V10', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 init_notes_db() # تشغيل قاعدة بيانات المفكرة عند بدء البوت
 
 # --- دالة جلب الرتبة الملكية (مهمة جداً للاذاعة) ---
@@ -899,6 +899,9 @@ async def private_chat_handler(event):
     
     await event.reply(private_response)
     
+# تفعيل نظام التاغ الملكي بأمان تام بدون استيراد دائري
+from tag import setup_tag_handler
+setup_tag_handler(client, ALLOWED_GROUPS, check_privilege, OWNER_ID)
     
 
 # بدء التشغيل النهائي
