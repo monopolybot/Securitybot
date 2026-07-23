@@ -2,20 +2,32 @@ import asyncio
 from telethon import events, types
 from database import db
 
-# ملاحظة: يتم ربط الـ client لاحقاً أو استيراده بأمان دون دورة دائرية
-# سنقوم بتصدير الدالة وتفعيلها عبر main مباشرة أو تعريفها كالتالي:
-
 def setup_tag_handler(client, ALLOWED_GROUPS, check_privilege, OWNER_ID):
     active_tagging = {}
 
     @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
     async def tag_handler(event):
         msg = event.raw_text
+        if not msg:
+            return
+            
         chat_id = event.chat_id
         gid = str(chat_id)
 
-        # التحقق من الصلاحية (مدير فأعلى لاستخدام المنشن الشامل)
+        # تحديد الكلمات المستهدفة الخاصة بنظام التاغ والمنشن فقط
+        tag_commands = [
+            "تاغ", "منشن", "تاق", "كل", 
+            "ايقاف التاغ", "ايقاف المنشن", "وقف التاغ", "ايقاف",
+            "تاغ للمدراء", "منشن للمدراء", "ادمنيه"
+        ]
+
+        # إذا كانت الرسالة ليست من ضمن أوامر التاغ، نتخطاها فوراً لكي نعمل بحرية مع باقي كود البوت
+        if msg not in tag_commands:
+            return
+
+        # التحقق من الصلاحية (يجب أن يكون المستخدم مديراً فما فوق لاستخدام أوامر التاغ)
         if not await check_privilege(event, "ادمن"):
+            await event.reply("⚠️ هذا الأمر مخصص للإدارة فقط!")
             return
 
         # --- 1. أمر بدء المنشن (تاغ للكل بالترتيب الملكي) ---
