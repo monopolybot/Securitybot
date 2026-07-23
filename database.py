@@ -2,12 +2,13 @@ import sqlite3
 import pickle
 import os
 
+# إعداد مسار التخزين الدائم كمتغير عام لضمان عدم حدوث أخطاء استدعاء
+PROTECT_DIR = "/app/data"
+
 class BotDB:
     def __init__(self):
-                # إعداد مسار التخزين الدائم (المجلد المرتبط بالـ Volume)
-                # تغيير المسار ليكون داخل مجلد التطبيق الذي يملك الصلاحيات
-        self.base_dir = "/app/data"
-
+        # استخدام المسار الثابت المرتبط بالـ Volume
+        self.base_dir = PROTECT_DIR
         
         # التأكد من وجود المجلد (لن يحذف عند الريستارت لأنه Volume)
         if not os.path.exists(self.base_dir):
@@ -18,6 +19,11 @@ class BotDB:
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.cursor = self.conn.cursor() 
         self.create_tables()
+
+    def create_tables(self):
+        # الجداول الخاصة بك
+        pass
+
 
 
     def create_tables(self):
