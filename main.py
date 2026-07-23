@@ -762,7 +762,7 @@ async def hourly_royal_broadcast():
 # --- استدعاء الموديولات المساعدة (الترتيب الصحيح) ---
 import locks  # اجعله الأول لضمان فحص الروابط قبل كل شيء
 import ranks
-import tag
+
 import callbacks
 import monopoly_radar
 
