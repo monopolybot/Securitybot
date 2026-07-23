@@ -1,10 +1,12 @@
 import asyncio
 from telethon import events, types
 from database import db
-# استيراد العناصر لضمان عدم حدوث Circular Import
-from __main__ import client, ALLOWED_GROUPS, check_privilege 
 
-# قاموس لتتبع عمليات التاغ الجارية لإمكانية إيقافها (Thread-safe)
+# --- الحل الجذري للاستيراد الدائري ---
+# بدلاً من الاستيراد من __main__، سنستورد client و ALLOWED_GROUPS من main مباشرة
+from main import client, ALLOWED_GROUPS, check_privilege, OWNER_ID
+
+# قاموس لتتبع عمليات التاغ الجارية لإمكانية إيقافها
 active_tagging = {}
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
@@ -17,39 +19,65 @@ async def tag_handler(event):
     if not await check_privilege(event, "ادمن"):
         return
 
-    # --- 1. أمر بدء المنشن (تاغ للكل) ---
+    # --- 1. أمر بدء المنشن (تاغ للكل بالترتيب الملكي) ---
     if msg in ["تاغ", "منشن", "تاق", "كل"]:
         if active_tagging.get(gid, False):
             await event.respond("⚠️ هناك عملية **تاغ ملكية** جارية بالفعل! استخدم `ايقاف التاغ` أولاً.")
             return
 
         active_tagging[gid] = True
-        await event.respond("📣 جاري بدء **المنشن الشامل**.. (يمكنك الإيقاف عبر: ايقاف التاغ)")
+        await event.respond("📣 جاري بدء **المنشن الشامل الملكي**.. (يمكنك الإيقاف عبر: ايقاف التاغ)")
 
         try:
-            # جلب الأعضاء (حد أقصى 500 عضو لضمان عدم استهلاك موارد الخادم)
-            members = await client.get_participants(chat_id, limit=500)
+            # 1. جلب المالك الأساسي وتجهيزه ليكون أول من يتم عمل منشن له ومنفصل
+            owner_entity = None
+            try:
+                owner_entity = await client.get_entity(OWNER_ID)
+            except:
+                pass
+
+            # 2. جلب المشرفين في المجموعة
+            admins = await client.get_participants(chat_id, filter=types.ChannelParticipantsAdmins())
             
-            # تقسيم الأعضاء لضمان عدم اعتبار الرسالة سبام (5 أعضاء لكل رسالة)
+            # 3. جلب كافة أعضاء المجموعة (حد أقصى 500)
+            all_members = await client.get_participants(chat_id, limit=500)
+            
+            # تصفية وفصل القوائم بدقة
+            admin_ids = {a.id for a in admins}
+            regular_members = [u for u in all_members if u.id != OWNER_ID and u.id not in admin_ids and not u.bot]
+            admin_list = [a for a in admins if a.id != OWNER_ID and not a.bot]
+
+            # --- الخطوة الأولى: منشن المالك منفصلاً لوحده في البداية ---
+            if owner_entity and active_tagging.get(gid, False):
+                owner_msg = f"👑 **سلطان الإمبراطورية (المالك):**\n▫️ [{owner_entity.first_name}](tg://user?id={owner_entity.id})"
+                await client.send_message(chat_id, owner_msg)
+                await asyncio.sleep(2.0)
+
+            # --- الخطوة الثانية: منشن المشرفين جماعةً أو تباعاً ---
+            if admin_list and active_tagging.get(gid, False):
+                admin_msg = "🛡️ **طاقم الإدارة الموقر:**\n"
+                for admin in admin_list:
+                    admin_msg += f"▫️ [{admin.first_name}](tg://user?id={admin.id}) "
+                await client.send_message(chat_id, admin_msg)
+                await asyncio.sleep(2.0)
+
+            # --- الخطوة الثالثة: منشن الأعضاء مقسمين لدفعات لتجنب السبام ---
             chunk_size = 5
-            for i in range(0, len(members), chunk_size):
-                # فحص هل تم طلب الإيقاف أثناء العملية؟
+            for i in range(0, len(regular_members), chunk_size):
                 if not active_tagging.get(gid, False):
                     break
                 
-                chunk = members[i:i + chunk_size]
-                tag_msg = "📣 **نداء للملكة:**\n"
+                chunk = regular_members[i:i + chunk_size]
+                tag_msg = "📣 **نداء لشعب مونوبولي:**\n"
                 for user in chunk:
-                    if not user.bot:
-                        tag_msg += f"▫️ [{user.first_name}](tg://user?id={user.id}) "
+                    tag_msg += f"▫️ [{user.first_name}](tg://user?id={user.id}) "
                 
-                if tag_msg != "📣 **نداء للملكة:**\n":
+                if tag_msg != "📣 **نداء لشعب مونوبولي:**\n":
                     await client.send_message(chat_id, tag_msg)
-                    # تأخير 2.5 ثانية (أمان أعلى لتجنب الـ Flood)
                     await asyncio.sleep(2.5)
             
             if active_tagging.get(gid):
-                await event.respond("✅ تم اكتمال **المنشن الشامل** بنجاح.")
+                await event.respond("✅ تم اكتمال **المنشن الشامل الملكي** بنجاح.")
                 active_tagging[gid] = False
         except Exception as e:
             print(f"Tag Error: {e}")
