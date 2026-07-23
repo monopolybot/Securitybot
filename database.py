@@ -20,9 +20,7 @@ class BotDB:
         self.cursor = self.conn.cursor() 
         self.create_tables()
 
-    def create_tables(self):
-        # الجداول الخاصة بك
-        pass
+    
 
 
 
