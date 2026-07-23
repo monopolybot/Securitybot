@@ -17,7 +17,7 @@ PROTECT_DIR = db.base_dir
 API_ID = 33183154
 API_HASH = 'ccb195afa05973cf544600ad3c313b84'
 # تأكد دائماً أن التوكن بين علامتي التنصيص بدون أي مسافات إضافية
-BOT_TOKEN = '8654727197:AAH_O83XYrTiFQJj81nBkvGM98lEKJAhoGo'
+BOT_TOKEN = '8654727197:AAFm9mBU83Q6lJro3NwUyfyM21_Ve54B4dM'
 OWNER_ID = 5010882230
 # --- قائمة المجموعات المسموحة المحدثة ---
 ALLOWED_GROUPS = [
