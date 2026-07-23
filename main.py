@@ -878,6 +878,26 @@ async def callback_handler(event):
         user_edit_state[event.sender_id] = {"name": name, "action": action, "step": "wait_index"}
         await event.edit(f"👑 **{action.upper()} ملاحظة للعضو {name}**\nأرسل الآن **رقم الملاحظة**:")
 
+
+# --- معالج المحادثات الخاصة (الرد في الخاص) ---
+@client.on(events.NewMessage(func=lambda e: e.is_private))
+async def private_chat_handler(event):
+    # تجاهل الرسائل إذا كانت من بوتات أخرى أو من البوت نفسه
+    if event.sender and event.sender.bot:
+        return
+        
+    sender_name = event.sender.first_name if event.sender else "صديقي"
+    
+    # الرد الملكي الترحيبي في المحادثة الخاصة مع معلومات التواصل والتوقيع
+    private_response = (
+        f"👑 **أهلاً بك يا {sender_name} Monopolyفي بوت قروب مونوبولي!** 👑\n\n"
+        f"🤖 أنا بوت إدارة إمبراطورية مونوبولي في الخدمة.\n"
+        f"📌 يرجى العلم أن الأوامر التفاعلية (مثل التاغ، الكشف، والردود) تعمل حصرياً داخل **المجموعات المسموحة** للإمبراطورية.\n\n"
+        f"💬 للتواصل مع المطور: @A_N505\n\n"
+        f"༺۝༒♛ 🅰🅽🅰🆂 ♛༒۝༻"
+    )
+    
+    await event.reply(private_response)
     
     
 
