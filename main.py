@@ -639,8 +639,10 @@ async def send_notes_page(event, notes, page):
         await event.reply(report, buttons=buttons)
 
 from telethon import events, Button
-from kings_db import get_kings_ranking
+from kings_db import get_kings_ranking, DB_KINGS_NAME
+import sqlite3
 
+# --- 1. دالة عرض القائمة الرئيسية (أسماء بالخط العريض، النقاط، فواصل، وأزرار التفاصيل) ---
 async def send_kings_page(event, page=0):
     kings = get_kings_ranking()
     
@@ -655,31 +657,27 @@ async def send_kings_page(event, page=0):
 
     page_size = 5
     total_pages = (len(kings) + page_size - 1) // page_size
-    
-    # ضمان بقاء رقم الصفحة ضمن الحدود الصحيحة
     page = max(0, min(page, total_pages - 1))
     
     start = page * page_size
     end = start + page_size
     page_kings = kings[start:end]
     
-    report = f"👑 **قائمة ملوك المجموعة (صفحة {page + 1}/{total_pages}):**\n━━━━━━━━━━━━━━━━━━\n"
-    for i, k in enumerate(page_kings, start=1):
-        uid, name, s6, s5, s4, s3, s2, s1, total = k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8]
-        rank_num = start + i
-        
-        # 📦 حساب إجمالي عدد الكروت بشكل تراكمي لجميع الفئات
-        total_cards_count = s6 + s5 + s4 + s3 + s2 + s1
-        
-        # التنسيق الملكي المتناسق لكل ملك مع تفاصيل النقاط، إجمالي الكروت، والمعرف
-        report += f"⚜️ {rank_num}. 👑 **{name}**\n"
-        report += f"   💎 النقاط: `{total}` | 📦 إجمالي الكروت: `{total_cards_count}` | 🆔 `{uid}`\n"
-        report += f"   ⭐ [6 نجوم: {s6} | 5 نجوم: {s5} | 4 نجوم: {s4} | 3 نجوم: {s3} | 2 نجوم: {s2} | 1 نجمة: {s1}]\n"
-        report += "   ──────────────────\n\n"
-        
-    report += "━━━━━━━━━━━━━━━━━━"
+    report = f"👑 **قائمة ملوك المجموعة (صفحة {page + 1}/{total_pages}):**\n━━━━━━━━━━━━━━━━━━\n\n"
     
     buttons = []
+    for i, k in enumerate(page_kings, start=1):
+        row_id, name, s6, s5, s4, s3, s2, s1, total = k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8]
+        rank_num = start + i
+        
+        # 👑 اسم الملك بالخط العريض + عدد النقاط بجانبه مباشرة + فاصل خط عريض بين الأسماء
+        report += f"⚜️ **{rank_num}. 👑 {name}** — 💎 النقاط: `{total}`\n"
+        report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        
+        # زر الـ Play بجانب اسم الملك لعرض تفاصيله الكاملة
+        buttons.append([Button.inline(f"▶️ عرض تفاصيل الملك: {name}", f"king_det_{row_id}")])
+        
+    # أزرار التنقل بين الصفحات
     nav_buttons = []
     if page > 0: 
         nav_buttons.append(Button.inline("⏪ رجوع", f"kpage_{page-1}"))
@@ -694,6 +692,47 @@ async def send_kings_page(event, page=0):
         await event.edit(report, buttons=buttons)
     else:
         await event.reply(report, buttons=buttons)
+
+
+# --- 2. دالة عرض تفاصيل الملك الفردية عند الضغط على زر Play ---
+async def send_king_detail_view(event, row_id):
+    conn = sqlite3.connect(DB_KINGS_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""SELECT rowid, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars 
+                      FROM kings_ranking WHERE rowid = ?""", (row_id,))
+    king = cursor.fetchone()
+    conn.close()
+    
+    if not king:
+        await event.answer("⚠️ عذراً، لم يتم العثور على بيانات هذا الملك.", alert=True)
+        return
+
+    _, name, s6, s5, s4, s3, s2, s1, total = king
+    total_cards_count = s6 + s5 + s4 + s3 + s2 + s1
+    
+        detail_text = (
+        f"👑 **سجل تفاصيل الملك الملكي**\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👤 **الاسم : {name}**\n"
+        f"⭐ **كرت ست نجوم : {s6}**\n"
+        f"⭐ **كرت خمس نجوم : {s5}**\n"
+        f"⭐ **كرت اربعة نجوم : {s4}**\n"
+        f"⭐ **كرت ثلاثة نجوم : {s3}**\n"
+        f"⭐ **كرت نجمتين : {s2}**\n"
+        f"⭐ **كرت نجمة : {s1}**\n\n"
+        f"💎 **مجموع النقاط : {total}**\n"
+        f"📦 **مجموع الكروت : {total_cards_count}**\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+
+    
+    buttons = [
+        [Button.inline("🔙 العودة لقائمة الملوك", "kpage_0")],
+        [Button.inline("❌ إغلاق", "close")]
+    ]
+    
+    await event.edit(detail_text, buttons=buttons)
+
 
 
 
