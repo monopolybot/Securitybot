@@ -637,35 +637,60 @@ async def send_notes_page(event, notes, page):
     else:
         await event.reply(report, buttons=buttons)
 
-async def send_kings_page(event, kings, page):
+from telethon import events, Button
+from kings_db import get_kings_ranking
+
+async def send_kings_page(event, page=0):
+    kings = get_kings_ranking()
+    
+    if not kings:
+        text = "👑 **قائمة ملوك المجموعة:**\n━━━━━━━━━━━━━━━━━━\n\n⚜️ لا توجد سجلات ملوك متاحة حالياً.\n\n━━━━━━━━━━━━━━━━━━"
+        buttons = [[Button.inline("❌ إغلاق", "close")]]
+        if isinstance(event, events.CallbackQuery.Event):
+            await event.edit(text, buttons=buttons)
+        else:
+            await event.reply(text, buttons=buttons)
+        return
+
     page_size = 5
     total_pages = (len(kings) + page_size - 1) // page_size
+    
+    # ضمان بقاء رقم الصفحة ضمن الحدود الصحيحة
+    page = max(0, min(page, total_pages - 1))
+    
     start = page * page_size
     end = start + page_size
     page_kings = kings[start:end]
     
     report = f"👑 **قائمة ملوك المجموعة (صفحة {page + 1}/{total_pages}):**\n━━━━━━━━━━━━━━━━━━\n"
     for i, k in enumerate(page_kings, start=1):
-        uid, name, score = k[0], k[1], k[2]
-        # تم إضافة التاج الملكي 👑 بجانب اسم العضو
-        report += f"⚜️ {start + i}. 👑 **{name}**\n   💎 النقاط: `{score}` | 🆔 `{uid}`\n"
-        # تم إضافة فاصل خفيف بين كل عضو والذي يليه
+        uid, name, s6, s5, s4, s3, s2, s1, total = k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8]
+        rank_num = start + i
+        
+        # التنسيق الملكي المتناسق لكل ملك مع تفاصيل النقاط والمعرف
+        report += f"⚜️ {rank_num}. 👑 **{name}**\n"
+        report += f"   💎 مجموع النقاط: `{total}` | 🆔 `{uid}`\n"
+        report += f"   ⭐ [6 نجوم: {s6} | 5 نجوم: {s5} | 4 نجوم: {s4} | 3 نجوم: {s3} | 2 نجوم: {s2} | 1 نجمة: {s1}]\n"
         report += "   ──────────────────\n\n"
         
     report += "━━━━━━━━━━━━━━━━━━"
     
     buttons = []
     nav_buttons = []
-    if page > 0: nav_buttons.append(Button.inline("⏪ رجوع", f"kpage_{page-1}"))
-    if page < total_pages - 1: nav_buttons.append(Button.inline("التالي ⏩", f"kpage_{page+1}"))
+    if page > 0: 
+        nav_buttons.append(Button.inline("⏪ رجوع", f"kpage_{page-1}"))
+    if page < total_pages - 1: 
+        nav_buttons.append(Button.inline("التالي ⏩", f"kpage_{page+1}"))
     
-    if nav_buttons: buttons.append(nav_buttons)
+    if nav_buttons: 
+        buttons.append(nav_buttons)
     buttons.append([Button.inline("❌ إغلاق", "close")])
     
     if isinstance(event, events.CallbackQuery.Event):
         await event.edit(report, buttons=buttons)
     else:
         await event.reply(report, buttons=buttons)
+
 
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
