@@ -10,6 +10,7 @@ from telethon.tl.types import UpdateBotChatInviteRequester, UpdateNewChannelMess
 from telethon import functions
 from notes_manager import init_notes_db, manage_note
 from kings_db import process_king_note, get_kings_ranking, adjust_king_score
+from callbacks import send_kings_page
 
 # استدعاء المسار من القاعدة مباشرة
 PROTECT_DIR = db.base_dir 
