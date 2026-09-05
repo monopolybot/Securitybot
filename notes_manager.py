@@ -28,23 +28,24 @@ def manage_note(action, data=None):
     amman_time = (datetime.utcnow() + timedelta(hours=3)).strftime("%Y-%m-%d %H:%M")
     
     try:
-        if action == "add":
+                if action == "add":
             name, content, admin_id = data
             
-            # 👑 استخراج اسم الملك المستهدف من نص الملاحظة (بين كلمة ملاحظة والنقطتين)
-            match_king = re.search(r'ملاحظة\s+(.*?)\s*:', content)
+            # 👑 استخراج اسم الملك المستهدف بمرونة تامة (يدعم أي مسافات بعد كلمة ملاحظة وحتى النقطتين)
+            match_king = re.search(r'ملاحظة\s+([^:\n]+?)\s*:', content, re.IGNORECASE)
             king_name = match_king.group(1).strip() if match_king else name
             
             cursor.execute("INSERT INTO admin_notes (member_name, note_content, admin_id, date_added) VALUES (?, ?, ?, ?)", 
                            (king_name, content, admin_id, amman_time))
             
-            # 👑 ربط فوري بنظام الملوك باستخدام اسم الملك المستخرج بدلاً من اسم المشرف
+            # 👑 ربط فوري بنظام الملوك باستخدام اسم الملك المستخرج
             try:
                 process_king_note(admin_id, king_name, content)
             except Exception as e_king:
                 print(f"King points add error: {e_king}")
                 
             res = "success"
+
 
         elif action == "get_active":
             cursor.execute("SELECT member_name FROM admin_notes WHERE status = 'active' GROUP BY member_name")
