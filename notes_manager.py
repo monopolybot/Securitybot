@@ -31,6 +31,13 @@ def manage_note(action, data=None):
             name, content, admin_id = data
             cursor.execute("INSERT INTO admin_notes (member_name, note_content, admin_id, date_added) VALUES (?, ?, ?, ?)", 
                            (name, content, admin_id, amman_time))
+            
+            # 👑 ربط فوري بنظام الملوك عند إضافة ملاحظة جديدة
+            try:
+                process_king_note(admin_id, name, content)
+            except Exception as e_king:
+                print(f"King points add error: {e_king}")
+                
             res = "success"
 
         elif action == "get_active":
@@ -43,22 +50,18 @@ def manage_note(action, data=None):
 
         elif action == "edit_by_index":
             name, index, new_content = data
-            # جلب معرف الملاحظة والنص القديم قبل التعديل
             cursor.execute("SELECT id, note_content, admin_id FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
             rows = cursor.fetchall()
             idx = int(index)
             if len(rows) >= idx:
                 note_id = rows[idx-1][0]
                 old_content = rows[idx-1][1]
-                admin_id = rows[idx-1][2] # أو يمكن أن يكون admin_id هو نفسه user_id حسب نظامك
+                admin_id = rows[idx-1][2]
                 
-                # تنفيذ التعديل في جدول الملاحظات
                 cursor.execute("UPDATE admin_notes SET note_content = ? WHERE id = ?", (new_content, note_id))
                 
-                # استدعاء دالة تحديث نقاط الملوك تلقائياً (خصم القديم وإضافة الجديد)
-                # ملاحظة: إذا كان admin_id أو member_name هو ما تعتمد عليه كـ user_id، يمكنك تمريره هنا:
+                # 👑 تحديث نقاط الملوك (خصم القديم وإضافة الجديد)
                 try:
-                    # نفترض أن admin_id أو المعرف هو المستخدم، أو يتم تمريره
                     update_king_note(admin_id, old_content, new_content)
                 except Exception as e_king:
                     print(f"King points update error: {e_king}")
@@ -67,14 +70,26 @@ def manage_note(action, data=None):
 
         elif action == "delete_by_index":
             name, index = data
-            cursor.execute("SELECT id FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
+            cursor.execute("SELECT id, note_content, admin_id FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
             ids = cursor.fetchall()
             idx = int(index)
             if len(ids) >= idx:
-                cursor.execute("DELETE FROM admin_notes WHERE id = ?", (ids[idx-1][0],))
+                note_id = ids[idx-1][0]
+                old_content = ids[idx-1][1]
+                admin_id = ids[idx-1][2]
+                
+                cursor.execute("DELETE FROM admin_notes WHERE id = ?", (note_id,))
+                
+                # 👑 خصم نقاط الملوك عند حذف الملاحظة باستخدام دالة update_king_note بتمرير محتوى جديد فارغ
+                try:
+                    update_king_note(admin_id, old_content, "")
+                except Exception as e_king:
+                    print(f"King points delete error: {e_king}")
+                    
                 res = "success"
 
         elif action == "delete_all":
+            # ملاحظة: إذا أردت تصفير نقاط الملوك أيضاً عند حذف الكل، يمكنك جلب السجلات وخصمها قبل الحذف
             cursor.execute("DELETE FROM admin_notes WHERE member_name = ?", (data,))
             res = "success" if cursor.rowcount > 0 else "not_found"
 
