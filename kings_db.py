@@ -6,7 +6,6 @@ DB_KINGS_NAME = "monopoly_kings.db"
 def init_kings_db():
     conn = sqlite3.connect(DB_KINGS_NAME)
     cursor = conn.cursor()
-    # جعل اسم العضو (member_name) هو المفتاح الأساسي لتجنب تداخل الأسماء
     cursor.execute('''CREATE TABLE IF NOT EXISTS kings_ranking 
                       (member_name TEXT PRIMARY KEY, 
                        stars_6 INTEGER DEFAULT 0,
@@ -22,6 +21,8 @@ def init_kings_db():
 init_kings_db()
 
 def extract_star_category(note_content):
+    if not note_content:
+        return None, 0
     content = note_content.lower()
     
     if any(w in content for w in ["6 نجوم", "ستة نجوم", "ست نجوم", "6ن"]):
@@ -41,12 +42,10 @@ def extract_star_category(note_content):
 
 def process_king_note(admin_id, member_name, note_content):
     cat, val = extract_star_category(note_content)
-    if not cat:
+    if not cat or not member_name:
         return False
         
-    # تنظيف اسم الملك من أي مسافات زائدة لضمان الدقة
     clean_name = member_name.strip()
-    
     conn = sqlite3.connect(DB_KINGS_NAME)
     cursor = conn.cursor()
     
@@ -90,6 +89,8 @@ def process_king_note(admin_id, member_name, note_content):
     return success
 
 def update_king_note(member_name, old_note_content, new_note_content):
+    if not member_name:
+        return False
     clean_name = member_name.strip()
     old_cat, old_val = extract_star_category(old_note_content)
     new_cat, new_val = extract_star_category(new_note_content)
@@ -132,20 +133,24 @@ def update_king_note(member_name, old_note_content, new_note_content):
             conn.commit()
             success = True
         else:
-            success = process_king_note(0, clean_name, new_note_content)
+            # إذا لم يكن موجوداً وتم التعديل، نقوم بإنشاء سجل جديد له مباشرة
+            conn.close()
+            return process_king_note(0, clean_name, new_note_content)
             
     except Exception as e:
         print(f"Error in update_king_note: {e}")
         success = False
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except:
+            pass
         
     return success
 
 def get_kings_ranking():
     conn = sqlite3.connect(DB_KINGS_NAME)
     cursor = conn.cursor()
-    # جلب السجلات مرتبة تنازلياً مع إرجاع dummy id في الموضع الأول ليتوافق تماماً مع دالة العرض الموجودة لديك
     cursor.execute("""SELECT rowid, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars 
                       FROM kings_ranking 
                       ORDER BY total_stars DESC""")
