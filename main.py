@@ -680,7 +680,7 @@ async def handle_notes_system(event):
         if not notes: return await event.reply("📜 **المفكرة فارغة حالياً.**")
         await send_notes_page(event, notes, 0)
         
-       elif text in ["ملوك", "قائمة الملوك"]:
+    elif text in ["ملوك", "قائمة الملوك"]:
         rows = get_kings_ranking()
         if not rows:
             await event.reply("📉 **لا توجد سجلات ملكية للنجوم حالياً.**")
@@ -700,6 +700,7 @@ async def handle_notes_system(event):
         kings_text += "━━━━━━━━━━━━━━━━━━\n💡 **استمروا في جمع النجوم للتربع على القمة!**"
         await event.reply(kings_text)
         return
+
 
 
 
