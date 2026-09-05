@@ -749,7 +749,8 @@ async def handle_notes_system(event):
         kings = get_kings_ranking()
         if not kings: 
             return await event.reply("👑 **قائمة ملوك المجموعة فارغة حالياً.**")
-        await send_kings_page(event, kings, 0)
+        await send_kings_page(event, 0)
+
 
     elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
