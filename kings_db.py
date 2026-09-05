@@ -6,9 +6,9 @@ DB_KINGS_NAME = "monopoly_kings.db"
 def init_kings_db():
     conn = sqlite3.connect(DB_KINGS_NAME)
     cursor = conn.cursor()
+    # جعل اسم العضو (member_name) هو المفتاح الأساسي لتجنب تداخل الأسماء
     cursor.execute('''CREATE TABLE IF NOT EXISTS kings_ranking 
-                      (user_id INTEGER PRIMARY KEY, 
-                       member_name TEXT, 
+                      (member_name TEXT PRIMARY KEY, 
                        stars_6 INTEGER DEFAULT 0,
                        stars_5 INTEGER DEFAULT 0,
                        stars_4 INTEGER DEFAULT 0,
@@ -39,16 +39,19 @@ def extract_star_category(note_content):
         
     return None, 0
 
-def process_king_note(user_id, member_name, note_content):
+def process_king_note(admin_id, member_name, note_content):
     cat, val = extract_star_category(note_content)
     if not cat:
         return False
         
+    # تنظيف اسم الملك من أي مسافات زائدة لضمان الدقة
+    clean_name = member_name.strip()
+    
     conn = sqlite3.connect(DB_KINGS_NAME)
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars FROM kings_ranking WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars FROM kings_ranking WHERE member_name = ?", (clean_name,))
         row = cursor.fetchone()
         
         if row:
@@ -62,9 +65,9 @@ def process_king_note(user_id, member_name, note_content):
             total += val
             
             cursor.execute("""UPDATE kings_ranking 
-                              SET member_name = ?, stars_6 = ?, stars_5 = ?, stars_4 = ?, stars_3 = ?, stars_2 = ?, stars_1 = ?, total_stars = ? 
-                              WHERE user_id = ?""", 
-                           (member_name, s6, s5, s4, s3, s2, s1, total, user_id))
+                              SET stars_6 = ?, stars_5 = ?, stars_4 = ?, stars_3 = ?, stars_2 = ?, stars_1 = ?, total_stars = ? 
+                              WHERE member_name = ?""", 
+                           (s6, s5, s4, s3, s2, s1, total, clean_name))
         else:
             s6 = 1 if cat == "stars_6" else 0
             s5 = 1 if cat == "stars_5" else 0
@@ -74,9 +77,9 @@ def process_king_note(user_id, member_name, note_content):
             s1 = 1 if cat == "stars_1" else 0
             total = val
             
-            cursor.execute("""INSERT INTO kings_ranking (user_id, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars) 
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", 
-                           (user_id, member_name, s6, s5, s4, s3, s2, s1, total))
+            cursor.execute("""INSERT INTO kings_ranking (member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars) 
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", 
+                           (clean_name, s6, s5, s4, s3, s2, s1, total))
         conn.commit()
         success = True
     except Exception as e:
@@ -86,7 +89,8 @@ def process_king_note(user_id, member_name, note_content):
         conn.close()
     return success
 
-def update_king_note(user_id, old_note_content, new_note_content):
+def update_king_note(member_name, old_note_content, new_note_content):
+    clean_name = member_name.strip()
     old_cat, old_val = extract_star_category(old_note_content)
     new_cat, new_val = extract_star_category(new_note_content)
     
@@ -97,7 +101,7 @@ def update_king_note(user_id, old_note_content, new_note_content):
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars FROM kings_ranking WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars FROM kings_ranking WHERE member_name = ?", (clean_name,))
         row = cursor.fetchone()
         
         if row:
@@ -123,12 +127,12 @@ def update_king_note(user_id, old_note_content, new_note_content):
                 
             cursor.execute("""UPDATE kings_ranking 
                               SET stars_6 = ?, stars_5 = ?, stars_4 = ?, stars_3 = ?, stars_2 = ?, stars_1 = ?, total_stars = ? 
-                              WHERE user_id = ?""", 
-                           (s6, s5, s4, s3, s2, s1, total, user_id))
+                              WHERE member_name = ?""", 
+                           (s6, s5, s4, s3, s2, s1, total, clean_name))
             conn.commit()
             success = True
         else:
-            success = process_king_note(user_id, "مستخدم", new_note_content)
+            success = process_king_note(0, clean_name, new_note_content)
             
     except Exception as e:
         print(f"Error in update_king_note: {e}")
@@ -141,14 +145,16 @@ def update_king_note(user_id, old_note_content, new_note_content):
 def get_kings_ranking():
     conn = sqlite3.connect(DB_KINGS_NAME)
     cursor = conn.cursor()
-    cursor.execute("""SELECT user_id, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars 
+    # جلب السجلات مرتبة تنازلياً مع إرجاع dummy id في الموضع الأول ليتوافق تماماً مع دالة العرض الموجودة لديك
+    cursor.execute("""SELECT rowid, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars 
                       FROM kings_ranking 
                       ORDER BY total_stars DESC""")
     rows = cursor.fetchall()
     conn.close()
     return rows
 
-def adjust_king_score(user_id, s6, s5, s4, s3, s2, s1):
+def adjust_king_score(member_name, s6, s5, s4, s3, s2, s1):
+    clean_name = member_name.strip()
     total = (s6 * 6) + (s5 * 5) + (s4 * 4) + (s3 * 3) + (s2 * 2) + (s1 * 1)
     
     conn = sqlite3.connect(DB_KINGS_NAME)
@@ -156,8 +162,8 @@ def adjust_king_score(user_id, s6, s5, s4, s3, s2, s1):
     try:
         cursor.execute("""UPDATE kings_ranking 
                           SET stars_6 = ?, stars_5 = ?, stars_4 = ?, stars_3 = ?, stars_2 = ?, stars_1 = ?, total_stars = ? 
-                          WHERE user_id = ?""", 
-                       (s6, s5, s4, s3, s2, s1, total, user_id))
+                          WHERE member_name = ?""", 
+                       (s6, s5, s4, s3, s2, s1, total, clean_name))
         conn.commit()
         success = True
     except Exception as e:
