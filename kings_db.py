@@ -25,10 +25,8 @@ init_kings_db()
 
 # دالة التحليل الذكي للنص وتحديث السجلات تراكمياً
 def process_king_note(user_id, member_name, note_content):
-    # تحويل النص إلى أحرف صغيرة لتسهيل المطابقة
     content = note_content.lower()
     
-    # تحديد الفئة المستهدفة بناءً على الكلمات المفتاحية أو الأرقام
     star_category = None
     star_value = 0
     
@@ -51,7 +49,6 @@ def process_king_note(user_id, member_name, note_content):
         star_category = "stars_1"
         star_value = 1
         
-    # إذا لم يتم التعرف على أي فئة نجوم، نتوقف
     if not star_category:
         return False
         
@@ -59,12 +56,10 @@ def process_king_note(user_id, member_name, note_content):
     cursor = conn.cursor()
     
     try:
-        # التأكد مما إذا كان العضو مسجلاً مسبقاً في قائمة الملوك
         cursor.execute("SELECT user_id, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars FROM kings_ranking WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         
         if row:
-            # العضو موجود: نقوم بتحديث القيم تراكمياً
             s6, s5, s4, s3, s2, s1, total = row[1], row[2], row[3], row[4], row[5], row[6], row[7]
             
             if star_category == "stars_6": s6 += 1
@@ -74,7 +69,6 @@ def process_king_note(user_id, member_name, note_content):
             elif star_category == "stars_2": s2 += 1
             elif star_category == "stars_1": s1 += 1
             
-            # تحديث الإجمالي التراكمي للنجوم
             total += star_value
             
             cursor.execute("""UPDATE kings_ranking 
@@ -82,7 +76,6 @@ def process_king_note(user_id, member_name, note_content):
                               WHERE user_id = ?""", 
                            (member_name, s6, s5, s4, s3, s2, s1, total, user_id))
         else:
-            # العضو غير موجود: نضيف سجل جديد لأول مرة
             s6 = 1 if star_category == "stars_6" else 0
             s5 = 1 if star_category == "stars_5" else 0
             s4 = 1 if star_category == "stars_4" else 0
@@ -104,4 +97,35 @@ def process_king_note(user_id, member_name, note_content):
     finally:
         conn.close()
         
+    return success
+
+# دالة لجلب كل الملوك مرتبين تنازلياً حسب مجموع النجوم
+def get_kings_ranking():
+    conn = sqlite3.connect(DB_KINGS_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""SELECT user_id, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars 
+                      FROM kings_ranking 
+                      ORDER BY total_stars DESC""")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+# دالة لتعديل أو تصحيح سجل عضو يدوياً في حال الخطأ
+def adjust_king_score(user_id, s6, s5, s4, s3, s2, s1):
+    total = (s6 * 6) + (s5 * 5) + (s4 * 4) + (s3 * 3) + (s2 * 2) + (s1 * 1)
+    
+    conn = sqlite3.connect(DB_KINGS_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""UPDATE kings_ranking 
+                          SET stars_6 = ?, stars_5 = ?, stars_4 = ?, stars_3 = ?, stars_2 = ?, stars_1 = ?, total_stars = ? 
+                          WHERE user_id = ?""", 
+                       (s6, s5, s4, s3, s2, s1, total, user_id))
+        conn.commit()
+        success = True
+    except Exception as e:
+        print(f"Error in adjust_king_score: {e}")
+        success = False
+    finally:
+        conn.close()
     return success
