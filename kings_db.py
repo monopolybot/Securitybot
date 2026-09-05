@@ -133,7 +133,7 @@ def update_king_note(member_name, old_note_content, new_note_content):
             conn.commit()
             success = True
         else:
-            # إذا لم يكن موجوداً وتم التعديل، نقوم بإنشاء سجل جديد له مباشرة
+            # إغلاق الاتصال الحالي قبل استدعاء دالة الإنشاء لتجنب التداخل
             conn.close()
             return process_king_note(0, clean_name, new_note_content)
             
