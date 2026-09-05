@@ -9,6 +9,7 @@ from database import db
 from telethon.tl.types import UpdateBotChatInviteRequester, UpdateNewChannelMessage, MessageService, MessageActionChatAddUser
 from telethon import functions
 from notes_manager import init_notes_db, manage_note
+from kings_db import process_king_note, get_kings_ranking, adjust_king_score
 
 # استدعاء المسار من القاعدة مباشرة
 PROTECT_DIR = db.base_dir 
@@ -839,18 +840,36 @@ async def handle_notes_system(event):
             return
 
     # --- 2. الأوامر العادية ---
-    if text.startswith("تسجيل ملاحظة"):
+        elif text.startswith("تسجيل ملاحظة"):
         try:
             content_part = text.replace("تسجيل ملاحظة", "").strip()
             name, note = content_part.split(":")
-            manage_note("add", (name.strip(), note.strip(), sender_id))
-            await event.reply(f"✅ **تم الحفظ:** {name.strip()}")
-        except: await event.reply("❌ **خطأ في التنسيق.**")
+            clean_name = name.strip()
+            clean_note = note.strip()
+            
+            # 1. تسجيل الملاحظة في المفكرة كالمعتاد
+            manage_note("add", (clean_name, clean_note, sender_id))
+            
+            # 2. محاولة استخراج ومعالجة نقاط ملوك المجموعة تلقائياً (تراكمياً)
+            # ملاحظة: إذا أردت استخدام الـ user_id الحقيقي للعضو بدلاً من sender_id (لأن المشرف هو من يكتب الملاحظة)، 
+            # يفضل تمرير معرف العضو إذا كان متوفراً، أو الاعتماد على الاسم مؤقتاً. 
+            # سنقوم بتمرير sender_id أو معرّف مؤقت حسب توفر كائن العضو، وهنا سنستخدم sender_id أو الاسم كمعرف فريد مبدئي.
+            process_king_note(sender_id, clean_name, clean_note)
+            
+            await event.reply(f"✅ **تم الحفظ في المفكرة وقائمة ملوك المجموعة:** {clean_name}")
+        except: 
+            await event.reply("❌ **خطأ في التنسيق.**")
+
 
     elif text == "عرض المفكرة":
         notes = manage_note("get_active")
         if not notes: return await event.reply("📜 **المفكرة فارغة.**")
         await send_notes_page(event, notes, 0)
+    elif text == "ملوك":
+        kings = get_kings_ranking()
+        if not kings: 
+            return await event.reply("👑 **قائمة ملوك المجموعة فارغة حالياً.**")
+        await send_kings_page(event, kings, 0)
 
     elif text.startswith("بحث ملاحظة"):
         name = text.replace("بحث ملاحظة", "").strip()
