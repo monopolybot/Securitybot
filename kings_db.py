@@ -1,5 +1,6 @@
 import sqlite3
 import re
+import time
 
 DB_KINGS_NAME = "monopoly_kings.db"
 
@@ -15,6 +16,10 @@ def init_kings_db():
                        stars_2 INTEGER DEFAULT 0,
                        stars_1 INTEGER DEFAULT 0,
                        total_stars INTEGER DEFAULT 0)''')
+                       
+    # جدول إضافي لمنع تكرار العمليات المتطابقة خلال ثوانٍ معدودة
+    cursor.execute('''CREATE TABLE IF NOT EXISTS processed_notes_log
+                      (admin_id TEXT, member_name TEXT, note_content TEXT, timestamp REAL)''')
     conn.commit()
     conn.close()
 
@@ -50,6 +55,20 @@ def process_king_note(admin_id, member_name, note_content):
     cursor = conn.cursor()
     
     try:
+        # منع التكرار المزدوج خلال آخر 5 ثوانٍ لنفس العضو والمحتوى
+        current_time = time.time()
+        cursor.execute("SELECT timestamp FROM processed_notes_log WHERE admin_id = ? AND member_name = ? AND note_content = ?", 
+                       (str(admin_id), clean_name, note_content))
+        last_log = cursor.fetchone()
+        if last_log and (current_time - last_log[0] < 5):
+            conn.close()
+            return True # تم معالجتها مسبقاً للتو، نتجاهل التكرار لمنع المضاعفة
+
+        # تسجيل العملية في سجل الحماية المؤقت
+        cursor.execute("DELETE FROM processed_notes_log WHERE timestamp < ?", (current_time - 30,))
+        cursor.execute("INSERT INTO processed_notes_log (admin_id, member_name, note_content, timestamp) VALUES (?, ?, ?, ?)",
+                       (str(admin_id), clean_name, note_content, current_time))
+
         cursor.execute("SELECT stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars FROM kings_ranking WHERE member_name = ?", (clean_name,))
         row = cursor.fetchone()
         
@@ -62,7 +81,6 @@ def process_king_note(admin_id, member_name, note_content):
             elif cat == "stars_2": s2 += 1
             elif cat == "stars_1": s1 += 1
             
-            # احتساب المجموع بناءً على عدد الكروت الحقيقي × فئتها لضمان عدم حدوث أي مضاعفة خاطئة
             total = (s6 * 6) + (s5 * 5) + (s4 * 4) + (s3 * 3) + (s2 * 2) + (s1 * 1)
             
             cursor.execute("""UPDATE kings_ranking 
@@ -97,8 +115,8 @@ def update_king_note(member_name, old_note_content, new_note_content):
     old_cat, old_val = extract_star_category(old_note_content)
     new_cat, new_val = extract_star_category(new_note_content)
     
-    if not old_cat and not new_cat:
-        return True
+    if old_cat == new_cat:
+        return True # لم يحدث تغير في الفئة
 
     conn = sqlite3.connect(DB_KINGS_NAME)
     cursor = conn.cursor()
@@ -126,7 +144,6 @@ def update_king_note(member_name, old_note_content, new_note_content):
                 elif new_cat == "stars_2": s2 += 1
                 elif new_cat == "stars_1": s1 += 1
                 
-            # إعادة حساب النقاط الإجمالية بضرب كل فئة في عددها الصحيح
             total = (s6 * 6) + (s5 * 5) + (s4 * 4) + (s3 * 3) + (s2 * 2) + (s1 * 1)
                 
             cursor.execute("""UPDATE kings_ranking 
