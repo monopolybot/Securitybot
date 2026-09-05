@@ -680,12 +680,11 @@ async def handle_notes_system(event):
         if not notes: return await event.reply("📜 **المفكرة فارغة حالياً.**")
         await send_notes_page(event, notes, 0)
         
-   if message in ["ملوك", "قائمة الملوك"]:
-       rows = get_kings_ranking()
-       if not rows:
-           await event.reply("📉 **لا توجد سجلات ملكية للنجوم حالياً.**")
-           return
-
+       elif text in ["ملوك", "قائمة الملوك"]:
+        rows = get_kings_ranking()
+        if not rows:
+            await event.reply("📉 **لا توجد سجلات ملكية للنجوم حالياً.**")
+            return
         
         kings_text = "👑 **| قـائمة مـلـوك مونوبولي (سجل النجوم)**\n━━━━━━━━━━━━━━━━━━\n"
         for idx, row in enumerate(rows, start=1):
@@ -701,6 +700,7 @@ async def handle_notes_system(event):
         kings_text += "━━━━━━━━━━━━━━━━━━\n💡 **استمروا في جمع النجوم للتربع على القمة!**"
         await event.reply(kings_text)
         return
+
 
 
 
