@@ -28,7 +28,7 @@ def manage_note(action, data=None):
     amman_time = (datetime.utcnow() + timedelta(hours=3)).strftime("%Y-%m-%d %H:%M")
     
     try:
-                if action == "add":
+        if action == "add":
             name, content, admin_id = data
             
             # 👑 استخراج اسم الملك المستهدف بمرونة تامة (يدعم أي مسافات بعد كلمة ملاحظة وحتى النقطتين)
@@ -45,7 +45,6 @@ def manage_note(action, data=None):
                 print(f"King points add error: {e_king}")
                 
             res = "success"
-
 
         elif action == "get_active":
             cursor.execute("SELECT member_name FROM admin_notes WHERE status = 'active' GROUP BY member_name")
