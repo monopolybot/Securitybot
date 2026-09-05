@@ -694,11 +694,27 @@ async def handle_notes_system(event):
         if not notes: return await event.reply("📜 **المفكرة فارغة حالياً.**")
         await send_notes_page(event, notes, 0)
         
-    elif text == "ملوك":
-        kings = get_kings_ranking()
-        if not kings: 
-            return await event.reply("👑 **قائمة ملوك المجموعة فارغة حالياً.**")
-        await send_kings_page(event, 0)
+        if message in ["ملوك", "قائمة الملوك"]:
+        rows = get_kings_ranking()
+        if not rows:
+            await event.reply("📉 **لا توجد سجلات ملكية للنجوم حالياً.**")
+            return
+        
+        kings_text = "👑 **| قـائمة مـلـوك مونوبولي (سجل النجوم)**\n━━━━━━━━━━━━━━━━━━\n"
+        for idx, row in enumerate(rows, start=1):
+            name = row[1]
+            s6, s5, s4, s3, s2, s1 = row[2], row[3], row[4], row[5], row[6], row[7]
+            total = row[8]
+            
+            medal = "🥇" if idx == 1 else ("🥈" if idx == 2 else ("🥉" if idx == 3 else f"`#{idx}`"))
+            kings_text += f"{medal} **{name}**\n"
+            kings_text += f"   ✨ مجموع النجوم: `{total}` (⭐6:{s6} | ⭐5:{s5} | ⭐4:{s4} | ⭐3:{s3} | ⭐2:{s2} | ⭐1:{s1})\n"
+            kings_text += "----------------------------------\n"
+            
+        kings_text += "━━━━━━━━━━━━━━━━━━\n💡 **استمروا في جمع النجوم للتربع على القمة!**"
+        await event.reply(kings_text)
+        return
+
 
 
     elif text.startswith("بحث ملاحظة"):
