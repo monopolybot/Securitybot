@@ -1,6 +1,7 @@
 import os
 from telethon import events, Button
 from database import db
+from kings_db import get_kings_ranking
 
 # استدعاء الكلاينت والبيانات الأساسية
 try:
@@ -25,12 +26,81 @@ async def check_callback_privilege(event, required_rank):
     ranks_order = {"عضو": 0, "مميز": 1, "ادمن": 2, "مدير": 3, "مالك": 4, "المنشئ": 5}
     return ranks_order.get(user_rank, 0) >= ranks_order.get(required_rank, 0)
 
+# --- 👑 دالة عرض قائمة ملوك المجموعة الملكية ---
+async def send_kings_page(event, page=0):
+    kings = get_kings_ranking()
+    
+    if not kings:
+        text = "👑 **قائمة ملوك المجموعة:**\n━━━━━━━━━━━━━━━━━━\n\n⚜️ لا توجد سجلات ملوك متاحة حالياً.\n\n━━━━━━━━━━━━━━━━━━"
+        buttons = [[Button.inline("❌ إغلاق", "close")]]
+        if isinstance(event, events.CallbackQuery.Event):
+            await event.edit(text, buttons=buttons)
+        else:
+            await event.reply(text, buttons=buttons)
+        return
+
+    page_size = 5
+    total_pages = (len(kings) + page_size - 1) // page_size
+    page = max(0, min(page, total_pages - 1))
+    
+    start = page * page_size
+    end = start + page_size
+    page_kings = kings[start:end]
+    
+    report = f"👑 **قائمة ملوك المجموعة (صفحة {page + 1}/{total_pages}):**\n━━━━━━━━━━━━━━━━━━\n"
+    for i, k in enumerate(page_kings, start=1):
+        uid, name, s6, s5, s4, s3, s2, s1, total = k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8]
+        rank_num = start + i
+        
+        report += f"⚜️ {rank_num}. 👑 **{name}**\n"
+        report += f"   💎 مجموع النقاط: `{total}` | 🆔 `{uid}`\n"
+        report += f"   ⭐ [6 نجوم: {s6} | 5 نجوم: {s5} | 4 نجوم: {s4} | 3 نجوم: {s3} | 2 نجوم: {s2} | 1 نجمة: {s1}]\n"
+        report += "   ──────────────────\n\n"
+        
+    report += "━━━━━━━━━━━━━━━━━━"
+    
+    buttons = []
+    nav_buttons = []
+    if page > 0: 
+        nav_buttons.append(Button.inline("⏪ رجوع", f"kpage_{page-1}"))
+    if page < total_pages - 1: 
+        nav_buttons.append(Button.inline("التالي ⏩", f"kpage_{page+1}"))
+    
+    if nav_buttons: 
+        buttons.append(nav_buttons)
+    buttons.append([Button.inline("❌ إغلاق", "close")])
+    
+    if isinstance(event, events.CallbackQuery.Event):
+        await event.edit(report, buttons=buttons)
+    else:
+        await event.reply(report, buttons=buttons)
+
+
 @client.on(events.CallbackQuery)
 async def callback_handler(event):
     data = event.data.decode('utf-8')
     gid = str(event.chat_id)
     
-    # التحقق من الصلاحية
+    # 👑 معالجة أزرار التنقل الخاصة بقائمة الملوك (لا تتطلب قيود إدارية صارمة ليتسنى للجميع رؤية القائمة)
+    if data.startswith("kpage_"):
+        try:
+            page_num = int(data.split("_")[1])
+            await send_kings_page(event, page=page_num)
+            await event.answer()
+        except Exception as e:
+            print(f"Error in kings pagination: {e}")
+            await event.answer("حدث خطأ أثناء التنقل بين الصفحات.", alert=True)
+        return
+
+    # زر الإغلاق العام
+    if data == "close":
+        try:
+            await event.delete()
+        except:
+            await event.edit("تم إغلاق اللوحة الملكية.")
+        return
+
+    # التحقق من الصلاحية لباقي أزرار الإدارة
     if not await check_callback_privilege(event, "ادمن"):
         return await event.answer("⚠️ عذرا هذه الصلاحيات محصورة لاصحاب الرتب الادارية فقط! 👑", alert=True)
 
@@ -64,7 +134,6 @@ async def callback_handler(event):
             db.cursor.execute("INSERT OR REPLACE INTO settings (gid, key, value) VALUES (?, ?, ?)", (gid, "welcome_status", new_status))
             db.conn.commit()
             await event.answer(f"✨ نظام الترحيب: {'✅ تفعيل' if new_status == 'on' else '❌ تعطيل'}")
-            # تحديث الواجهة فوراً
             await callback_handler(event_with_new_data(event, "show_settings"))
             
         else:
@@ -75,11 +144,11 @@ async def callback_handler(event):
 
     # --- الأقسام الأخرى ---
     elif data == "show_ranks":
-        ranks_text = "🎖️ **الهرم الإداري المعتمد في Monopoly:**\n━━━━━━━━━━━━━━\n..." # النص المختصر
+        ranks_text = "🎖️ **الهرم الإداري المعتمد في Monopoly:**\n━━━━━━━━━━━━━━\n..." 
         await event.edit(ranks_text, buttons=[[Button.inline("⬅️ رجوع", "show_main")]])
 
     elif data == "show_cmds":
-        cmds_text = "📜 **دليل الأوامر الإمبراطورية:**\n━━━━━━━━━━━━━━\n..." # النص المختصر
+        cmds_text = "📜 **دليل الأوامر الإمبراطورية:**\n━━━━━━━━━━━━━━\n..." 
         await event.edit(cmds_text, buttons=[[Button.inline("⬅️ رجوع", "show_main")]])
 
     elif data == "show_settings":
@@ -89,28 +158,18 @@ async def callback_handler(event):
             [Button.inline("⬅️ رجوع", "show_main")]
         ])
 
-    elif data == "close":
-        await event.delete()
-    # --- أزرار نظام المفكرة (المضافة حديثاً) ---
-    
-    # تأكيد الأرشفة وبدء مفكرة جديدة
+    # --- تأكيد الأرشفة وبدء مفكرة جديدة ---
     elif data == "confirm_archive":
         from notes_manager import manage_note
         manage_note("archive")
         await event.edit("✅ **إرادة ملكية:** تم نقل كافة الملاحظات للأرشيف بنجاح، والمفكرة الحالية الآن فارغة وجاهزة.")
         
-    # عرض صفحة معينة (في حال أردنا تطوير التنقل لاحقاً)
-    elif data.startswith("page_"):
-        # هذه سنستخدمها إذا زاد عدد الأسماء عن 10 لتظهر أزرار "التالي"
-        page = int(data.split("_")[1])
-        await event.answer(f"📄 أنت الآن في الصفحة {page}", alert=False)
-            # --- التنقل بين صفحات المفكرة الملكية ---
+    # --- التنقل بين صفحات المفكرة الملكية ---
     elif data.startswith("note_page_"):
         from notes_manager import manage_note
         page_num = int(data.split("_")[-1])
         notes = manage_note("get_active")
         
-        # تقسيم البيانات: كل صفحة 5 ملاحظات
         start = page_num * 5
         end = start + 5
         current_page = notes[start:end]
@@ -122,14 +181,12 @@ async def callback_handler(event):
         for i, n in enumerate(current_page, start + 1):
             report += f"{i}. 👤 **{n[0]}**: {n[1]}\n"
             
-        # إنشاء أزرار التنقل (ديناميكي)
         nav_btns = []
         if page_num > 0:
             nav_btns.append(Button.inline("▶️ السابق", f"note_page_{page_num - 1}"))
         if len(notes) > end:
             nav_btns.append(Button.inline("التالي ◀️", f"note_page_{page_num + 1}"))
             
-        # تحديث الرسالة بالأزرار الجديدة
         await event.edit(report, buttons=[nav_btns, [Button.inline("❌ إغلاق", "close")]])
     
 def event_with_new_data(event, new_data):
