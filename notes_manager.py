@@ -62,7 +62,6 @@ def manage_note(action, data=None):
             if len(rows) >= idx:
                 note_id = rows[idx-1][0]
                 old_content = rows[idx-1][1]
-                admin_id = rows[idx-1][2]
                 old_king_name = rows[idx-1][3]
                 
                 # استخراج اسم الملك الجديد إن تغير في التعديل
@@ -71,9 +70,9 @@ def manage_note(action, data=None):
                 
                 cursor.execute("UPDATE admin_notes SET member_name = ?, note_content = ? WHERE id = ?", (new_king_name, new_content, note_id))
                 
-                # 👑 تحديث نقاط الملوك (خصم القديم وإضافة الجديد)
+                # 👑 تحديث نقاط الملوك باستخدام اسم الملك الجديد (أو القديم)
                 try:
-                    update_king_note(admin_id, old_content, new_content)
+                    update_king_note(new_king_name, old_content, new_content)
                 except Exception as e_king:
                     print(f"King points update error: {e_king}")
                     
@@ -81,19 +80,19 @@ def manage_note(action, data=None):
 
         elif action == "delete_by_index":
             name, index = data
-            cursor.execute("SELECT id, note_content, admin_id FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
+            cursor.execute("SELECT id, note_content, admin_id, member_name FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
             ids = cursor.fetchall()
             idx = int(index)
             if len(ids) >= idx:
                 note_id = ids[idx-1][0]
                 old_content = ids[idx-1][1]
-                admin_id = ids[idx-1][2]
+                king_name = ids[idx-1][3]
                 
                 cursor.execute("DELETE FROM admin_notes WHERE id = ?", (note_id,))
                 
-                # 👑 خصم نقاط الملوك عند حذف الملاحظة
+                # 👑 خصم نقاط الملوك عند حذف الملاحظة باستخدام اسم الملك الصحيح
                 try:
-                    update_king_note(admin_id, old_content, "")
+                    update_king_note(king_name, old_content, "")
                 except Exception as e_king:
                     print(f"King points delete error: {e_king}")
                     
