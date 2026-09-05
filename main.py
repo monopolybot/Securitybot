@@ -681,10 +681,10 @@ async def handle_notes_system(event):
         await send_notes_page(event, notes, 0)
         
     elif text in ["ملوك", "قائمة الملوك"]:
-        rows = get_kings_ranking()
-        if not rows:
-            await event.reply("📉 **لا توجد سجلات ملكية للنجوم حالياً.**")
-            return
+        from callbacks import send_kings_page
+        await send_kings_page(event, page=0)
+        return
+
         
         kings_text = "👑 **| قـائمة مـلـوك مونوبولي (سجل النجوم)**\n━━━━━━━━━━━━━━━━━━\n"
         for idx, row in enumerate(rows, start=1):
