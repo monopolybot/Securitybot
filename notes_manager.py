@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
+from kings_db import update_king_note, process_king_note
 
 DB_NAME = "monopoly_notes.db"
 
@@ -42,11 +43,26 @@ def manage_note(action, data=None):
 
         elif action == "edit_by_index":
             name, index, new_content = data
-            cursor.execute("SELECT id FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
-            ids = cursor.fetchall()
+            # جلب معرف الملاحظة والنص القديم قبل التعديل
+            cursor.execute("SELECT id, note_content, admin_id FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
+            rows = cursor.fetchall()
             idx = int(index)
-            if len(ids) >= idx:
-                cursor.execute("UPDATE admin_notes SET note_content = ? WHERE id = ?", (new_content, ids[idx-1][0]))
+            if len(rows) >= idx:
+                note_id = rows[idx-1][0]
+                old_content = rows[idx-1][1]
+                admin_id = rows[idx-1][2] # أو يمكن أن يكون admin_id هو نفسه user_id حسب نظامك
+                
+                # تنفيذ التعديل في جدول الملاحظات
+                cursor.execute("UPDATE admin_notes SET note_content = ? WHERE id = ?", (new_content, note_id))
+                
+                # استدعاء دالة تحديث نقاط الملوك تلقائياً (خصم القديم وإضافة الجديد)
+                # ملاحظة: إذا كان admin_id أو member_name هو ما تعتمد عليه كـ user_id، يمكنك تمريره هنا:
+                try:
+                    # نفترض أن admin_id أو المعرف هو المستخدم، أو يتم تمريره
+                    update_king_note(admin_id, old_content, new_content)
+                except Exception as e_king:
+                    print(f"King points update error: {e_king}")
+                    
                 res = "success"
 
         elif action == "delete_by_index":
