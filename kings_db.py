@@ -61,7 +61,9 @@ def process_king_note(admin_id, member_name, note_content):
             elif cat == "stars_3": s3 += 1
             elif cat == "stars_2": s2 += 1
             elif cat == "stars_1": s1 += 1
-            total += val
+            
+            # احتساب المجموع بناءً على عدد الكروت الحقيقي × فئتها لضمان عدم حدوث أي مضاعفة خاطئة
+            total = (s6 * 6) + (s5 * 5) + (s4 * 4) + (s3 * 3) + (s2 * 2) + (s1 * 1)
             
             cursor.execute("""UPDATE kings_ranking 
                               SET stars_6 = ?, stars_5 = ?, stars_4 = ?, stars_3 = ?, stars_2 = ?, stars_1 = ?, total_stars = ? 
@@ -115,7 +117,6 @@ def update_king_note(member_name, old_note_content, new_note_content):
                 elif old_cat == "stars_3": s3 = max(0, s3 - 1)
                 elif old_cat == "stars_2": s2 = max(0, s2 - 1)
                 elif old_cat == "stars_1": s1 = max(0, s1 - 1)
-                total = max(0, total - old_val)
                 
             if new_cat:
                 if new_cat == "stars_6": s6 += 1
@@ -124,7 +125,9 @@ def update_king_note(member_name, old_note_content, new_note_content):
                 elif new_cat == "stars_3": s3 += 1
                 elif new_cat == "stars_2": s2 += 1
                 elif new_cat == "stars_1": s1 += 1
-                total += new_val
+                
+            # إعادة حساب النقاط الإجمالية بضرب كل فئة في عددها الصحيح
+            total = (s6 * 6) + (s5 * 5) + (s4 * 4) + (s3 * 3) + (s2 * 2) + (s1 * 1)
                 
             cursor.execute("""UPDATE kings_ranking 
                               SET stars_6 = ?, stars_5 = ?, stars_4 = ?, stars_3 = ?, stars_2 = ?, stars_1 = ?, total_stars = ? 
@@ -133,7 +136,6 @@ def update_king_note(member_name, old_note_content, new_note_content):
             conn.commit()
             success = True
         else:
-            # إغلاق الاتصال الحالي قبل استدعاء دالة الإنشاء لتجنب التداخل
             conn.close()
             return process_king_note(0, clean_name, new_note_content)
             
