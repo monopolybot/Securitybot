@@ -1,4 +1,5 @@
 import sqlite3
+import re
 from datetime import datetime, timedelta
 from kings_db import update_king_note, process_king_note
 
@@ -29,12 +30,17 @@ def manage_note(action, data=None):
     try:
         if action == "add":
             name, content, admin_id = data
-            cursor.execute("INSERT INTO admin_notes (member_name, note_content, admin_id, date_added) VALUES (?, ?, ?, ?)", 
-                           (name, content, admin_id, amman_time))
             
-            # 👑 ربط فوري بنظام الملوك عند إضافة ملاحظة جديدة
+            # 👑 استخراج اسم الملك المستهدف من نص الملاحظة (بين كلمة ملاحظة والنقطتين)
+            match_king = re.search(r'ملاحظة\s+(.*?)\s*:', content)
+            king_name = match_king.group(1).strip() if match_king else name
+            
+            cursor.execute("INSERT INTO admin_notes (member_name, note_content, admin_id, date_added) VALUES (?, ?, ?, ?)", 
+                           (king_name, content, admin_id, amman_time))
+            
+            # 👑 ربط فوري بنظام الملوك باستخدام اسم الملك المستخرج بدلاً من اسم المشرف
             try:
-                process_king_note(admin_id, name, content)
+                process_king_note(admin_id, king_name, content)
             except Exception as e_king:
                 print(f"King points add error: {e_king}")
                 
@@ -50,15 +56,20 @@ def manage_note(action, data=None):
 
         elif action == "edit_by_index":
             name, index, new_content = data
-            cursor.execute("SELECT id, note_content, admin_id FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
+            cursor.execute("SELECT id, note_content, admin_id, member_name FROM admin_notes WHERE member_name = ? ORDER BY id ASC", (name,))
             rows = cursor.fetchall()
             idx = int(index)
             if len(rows) >= idx:
                 note_id = rows[idx-1][0]
                 old_content = rows[idx-1][1]
                 admin_id = rows[idx-1][2]
+                old_king_name = rows[idx-1][3]
                 
-                cursor.execute("UPDATE admin_notes SET note_content = ? WHERE id = ?", (new_content, note_id))
+                # استخراج اسم الملك الجديد إن تغير في التعديل
+                match_king = re.search(r'ملاحظة\s+(.*?)\s*:', new_content)
+                new_king_name = match_king.group(1).strip() if match_king else old_king_name
+                
+                cursor.execute("UPDATE admin_notes SET member_name = ?, note_content = ? WHERE id = ?", (new_king_name, new_content, note_id))
                 
                 # 👑 تحديث نقاط الملوك (خصم القديم وإضافة الجديد)
                 try:
@@ -80,7 +91,7 @@ def manage_note(action, data=None):
                 
                 cursor.execute("DELETE FROM admin_notes WHERE id = ?", (note_id,))
                 
-                # 👑 خصم نقاط الملوك عند حذف الملاحظة باستخدام دالة update_king_note بتمرير محتوى جديد فارغ
+                # 👑 خصم نقاط الملوك عند حذف الملاحظة
                 try:
                     update_king_note(admin_id, old_content, "")
                 except Exception as e_king:
@@ -89,7 +100,6 @@ def manage_note(action, data=None):
                 res = "success"
 
         elif action == "delete_all":
-            # ملاحظة: إذا أردت تصفير نقاط الملوك أيضاً عند حذف الكل، يمكنك جلب السجلات وخصمها قبل الحذف
             cursor.execute("DELETE FROM admin_notes WHERE member_name = ?", (data,))
             res = "success" if cursor.rowcount > 0 else "not_found"
 
