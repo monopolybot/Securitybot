@@ -120,21 +120,17 @@ async def anti_bad_words(event):
                 return await event.respond(f"⚠️ **مـمـنـوع نـشر الروابط!**\n━━━━━━━━━━━━━━\n👤 **العضو:** [{event.sender.first_name}](tg://user?id={event.sender_id})\n⚖️ **إنذاراتك:** `({w_count}/3)`\n━━━━━━━━━━━━━━", delete_after=15)
             except: pass
 
-    # الفحص المتقدم بالدمج والكشف الذكي للحروف المتقطعة والكلمات المحظورة
+    # 2. فحص الكلمات البذيئة (تطبيق المحكمة العليا فوراً)
     cleaned_msg = clean_text_refined(full_text.lower())
-    original_cleaned = clean_text_refined(full_text)
-    
-    is_bad = False
-    for bad in BAD_WORDS:
-        clean_bad = clean_text_refined(bad.lower())
-        if clean_bad in cleaned_msg or clean_bad in original_cleaned:
-            is_bad = True
-            break
+    words_in_message = cleaned_msg.split()
 
-    if is_bad:
+    if any(word in words_in_message for word in BAD_WORDS):
         try:
+            # الفتح الفوري للنيران (حذف + كتم + إنذار)
             await event.delete() 
-            db.add_warn(gid, event.sender_id) 
+            db.add_warn(gid, event.sender_id) # تسجيل الإنذار في القاعدة للأرشفة
+            
+            # تنفيذ الكتم الفوري (قفل الإرسال نهائياً)
             await client(functions.channels.EditBannedRequest(
                 event.chat_id, event.sender_id, ChatBannedRights(until_date=None, send_messages=True)
             ))
@@ -143,27 +139,17 @@ async def anti_bad_words(event):
                 f"⚠️ **تـنـبـيـه مـلـكـي حـازم (طرد من القروب)**\n━━━━━━━━━━━━━━\n"
                 f"📖 **قال تعالى:**\n《 **مَّا يَلْفِظُ مِن قَوْلٍ إِلَّا لَدَيْهِ رَقِيبٌ عَتِيدٌ** 》\n━━━━━━━━━━━━━━\n"
                 f"👤 **المخالف:** [{event.sender.first_name}](tg://user?id={event.sender_id})\n"
-                f"🚫 **المخالفة:** تلفظ بكلمات محظورة أو مخالفة للآداب\n"
-                f"⚖️ **الإجراء:** كتم فوري + إرسال تقرير إداري شامل\n━━━━━━━━━━━━━━"
+                f"🚫 **المخالفة:** تلفظ بكلمات محظورة\n"
+                f"⚖️ **الإجراء:** كتم فوري + استدعاء الإدارة\n━━━━━━━━━━━━━━"
             )
             await event.respond(warn_txt)
             
-            # إرسال سجل الأخطاء والانتهاكات لجميع مجموعات الإدارة
-            log_text = (
-                f"📜 **| تـقـريـر انتهاك أمني (الدرع الملكي)**\n"
-                f"━━━━━━━━━━━━━━\n"
-                f"👤 **المخالف:** `{event.sender.first_name}` (`{event.sender_id}`)\n"
-                f"💬 **النص المخالف:** `{full_text}`\n"
-                f"📍 **المجموعة:** `{event.chat.title}`\n"
-                f"⏰ **التوقيت:** `{datetime.now().strftime('%I:%M %p')}`\n"
-                f"━━━━━━━━━━━━━━"
-            )
-            for log_gid in ALLOWED_GROUPS:
-                try: await client.send_message(log_gid, log_text)
-                except: pass
-
+            # 📢 إرسال أمر "مشرف" لتفعيل المنشن التلقائي الذي صنعته أنت
+            await event.respond("مشرف") 
+            
         except Exception as e:
             print(f"Error in Imperial Shield: {e}")
+            
 
 # --- 4. نظام الردود الملكية والذكية ---
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
