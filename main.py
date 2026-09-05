@@ -647,7 +647,11 @@ async def send_kings_page(event, kings, page):
     report = f"👑 **قائمة ملوك المجموعة (صفحة {page + 1}/{total_pages}):**\n━━━━━━━━━━━━━━━━━━\n"
     for i, k in enumerate(page_kings, start=1):
         uid, name, score = k[0], k[1], k[2]
-        report += f"⚜️ {start + i}. **{name}**\n   💎 النقاط: `{score}` | 🆔 `{uid}`\n\n"
+        # تم إضافة التاج الملكي 👑 بجانب اسم العضو
+        report += f"⚜️ {start + i}. 👑 **{name}**\n   💎 النقاط: `{score}` | 🆔 `{uid}`\n"
+        # تم إضافة فاصل خفيف بين كل عضو والذي يليه
+        report += "   ──────────────────\n\n"
+        
     report += "━━━━━━━━━━━━━━━━━━"
     
     buttons = []
@@ -662,6 +666,7 @@ async def send_kings_page(event, kings, page):
         await event.edit(report, buttons=buttons)
     else:
         await event.reply(report, buttons=buttons)
+
 
 @client.on(events.NewMessage(chats=ALLOWED_GROUPS))
 async def handle_notes_system(event):
