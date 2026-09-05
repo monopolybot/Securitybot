@@ -10,7 +10,7 @@ from telethon.tl.types import UpdateBotChatInviteRequester, UpdateNewChannelMess
 from telethon import functions
 from notes_manager import init_notes_db, manage_note
 from kings_db import process_king_note, get_kings_ranking, adjust_king_score
-from callbacks import send_kings_page
+#from callbacks import send_kings_page
 
 # استدعاء المسار من القاعدة مباشرة
 PROTECT_DIR = db.base_dir 
@@ -682,9 +682,9 @@ async def handle_notes_system(event):
         await send_notes_page(event, notes, 0)
         
     elif text in ["ملوك", "قائمة الملوك"]:
-        from callbacks import send_kings_page
         await send_kings_page(event, page=0)
         return
+
 
         
         kings_text = "👑 **| قـائمة مـلـوك مونوبولي (سجل النجوم)**\n━━━━━━━━━━━━━━━━━━\n"
@@ -721,7 +721,7 @@ async def handle_notes_system(event):
         res = manage_note("delete_all", name)
         await event.reply(f"🗑️ **تم مسح الملف الملكي لـ:** `{name}`" if res == "success" else "❌ **الاسم غير موجود في السجلات.**")
 
-@client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_") or d.startswith(b"del_") or d.startswith(b"page_") or d.startswith(b"kpage_")))
+@client.on(events.CallbackQuery(data=lambda d: d.startswith(b"edit_") or d.startswith(b"del_") or d.startswith(b"page_") or d.startswith(b"kpage_") or d.startswith(b"king_det_") or d == b"show_kings_panel"))
 async def callback_handler(event):
     data = event.data.decode()
     if data.startswith("page_"):
@@ -730,20 +730,110 @@ async def callback_handler(event):
         await send_notes_page(event, notes, page)
     elif data.startswith("kpage_"):
         page = int(data.split("_")[1])
-        kings = get_kings_ranking()
-        await send_kings_page(event, kings, page)
+        await send_kings_page(event, page)
+    elif data.startswith("king_det_"):
+        row_id = int(data.split("_")[2])
+        await send_king_detail_view(event, row_id)
     elif data == "show_kings_panel":
-        kings = get_kings_ranking()
-        if not kings:
-            await event.answer("قائمة الملوك فارغة حالياً!", alert=True)
-            return
-        await send_kings_page(event, 0)
-
+        await send_kings_page(event, page=0)
+    elif data == "close":
+        await event.delete()
     else:
-        action, name = data.split("_")
-        user_edit_state[event.sender_id] = {"name": name, "action": action, "step": "wait_index"}
-        await event.edit(f"👑 **{action.upper()} ملاحظة للعضو {name}**\n━━━━━━━━━━━━━━\n**أرسل الآن رقم الملاحظة:**\n━━━━━━━━━━━━━━")
+        try:
+            action, name = data.split("_", 1)
+            user_edit_state[event.sender_id] = {"name": name, "action": action, "step": "wait_index"}
+            await event.edit(f"👑 **{action.upper()} ملاحظة للعضو {name}**\n━━━━━━━━━━━━━━\n**أرسل الآن رقم الملاحظة:**\n━━━━━━━━━━━━━━")
+        except Exception as e:
+            print(f"Error in callback: {e}")
 
+# --- 👑 دوال عرض قائمة الملوك والتفاصيل التفاعلية ---
+from kings_db import get_kings_ranking, DB_KINGS_NAME
+import sqlite3
+
+async def send_kings_page(event, page=0):
+    kings = get_kings_ranking()
+    
+    if not kings:
+        text = "👑 **قائمة ملوك المجموعة:**\n━━━━━━━━━━━━━━━━━━\n\n⚜️ لا توجد سجلات ملوك متاحة حالياً.\n\n━━━━━━━━━━━━━━━━━━"
+        buttons = [[Button.inline("❌ إغلاق", "close")]]
+        if isinstance(event, events.CallbackQuery.Event):
+            await event.edit(text, buttons=buttons)
+        else:
+            await event.reply(text, buttons=buttons)
+        return
+
+    page_size = 5
+    total_pages = (len(kings) + page_size - 1) // page_size
+    page = max(0, min(page, total_pages - 1))
+    
+    start = page * page_size
+    end = start + page_size
+    page_kings = kings[start:end]
+    
+    report = f"👑 **قائمة ملوك المجموعة (صفحة {page + 1}/{total_pages}):**\n━━━━━━━━━━━━━━━━━━\n\n"
+    
+    buttons = []
+    for i, k in enumerate(page_kings, start=1):
+        row_id, name, s6, s5, s4, s3, s2, s1, total = k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8]
+        rank_num = start + i
+        
+        report += f"⚜️ **{rank_num}. 👑 {name}** — 💎 النقاط: `{total}`\n"
+        report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        buttons.append([Button.inline(f"▶️ عرض تفاصيل الملك: {name}", f"king_det_{row_id}")])
+        
+    nav_buttons = []
+    if page > 0: 
+        nav_buttons.append(Button.inline("⏪ رجوع", f"kpage_{page-1}"))
+    if page < total_pages - 1: 
+        nav_buttons.append(Button.inline("التالي ⏩", f"kpage_{page+1}"))
+    
+    if nav_buttons: 
+        buttons.append(nav_buttons)
+    buttons.append([Button.inline("❌ إغلاق", "close")])
+    
+    if isinstance(event, events.CallbackQuery.Event):
+        await event.edit(report, buttons=buttons)
+    else:
+        await event.reply(report, buttons=buttons)
+
+
+async def send_king_detail_view(event, row_id):
+    conn = sqlite3.connect(DB_KINGS_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""SELECT rowid, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars 
+                      FROM kings_ranking WHERE rowid = ?""", (row_id,))
+    king = cursor.fetchone()
+    conn.close()
+    
+    if not king:
+        await event.answer("⚠️ عذراً، لم يتم العثور على بيانات هذا الملك.", alert=True)
+        return
+
+    _, name, s6, s5, s4, s3, s2, s1, total = king
+    total_cards_count = s6 + s5 + s4 + s3 + s2 + s1
+    
+    detail_text = (
+        f"👑 **سجل تفاصيل الملك الملكي**\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👤 **الاسم : {name}**\n"
+        f"⭐ **كرت ست نجوم : {s6}**\n"
+        f"⭐ **كرت خمس نجوم : {s5}**\n"
+        f"⭐ **كرت اربعة نجوم : {s4}**\n"
+        f"⭐ **كرت ثلاثة نجوم : {s3}**\n"
+        f"⭐ **كرت نجمتين : {s2}**\n"
+        f"⭐ **كرت نجمة : {s1}**\n\n"
+        f"💎 **مجموع النقاط : {total}**\n"
+        f"📦 **مجموع الكروت : {total_cards_count}**\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+    
+    buttons = [
+        [Button.inline("🔙 العودة لقائمة الملوك", "kpage_0")],
+        [Button.inline("❌ إغلاق", "close")]
+    ]
+    
+    await event.edit(detail_text, buttons=buttons)
+    
 @client.on(events.NewMessage(func=lambda e: e.is_private))
 async def private_chat_handler(event):
     if event.sender and event.sender.bot:
