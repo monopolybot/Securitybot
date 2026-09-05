@@ -2,7 +2,6 @@ import os
 import sqlite3
 from telethon import events, Button
 from database import db
-from kings_db import get_kings_ranking, DB_KINGS_NAME
 
 # استدعاء الكلاينت والبيانات الأساسية
 try:
@@ -27,124 +26,11 @@ async def check_callback_privilege(event, required_rank):
     ranks_order = {"عضو": 0, "مميز": 1, "ادمن": 2, "مدير": 3, "مالك": 4, "المنشئ": 5}
     return ranks_order.get(user_rank, 0) >= ranks_order.get(required_rank, 0)
 
-# --- 👑 دالة عرض قائمة ملوك المجموعة الملكية (مع أسماء عريضة، تيجان، ونقاط، وزر Play) ---
-async def send_kings_page(event, page=0):
-    kings = get_kings_ranking()
-    
-    if not kings:
-        text = "👑 **قائمة ملوك المجموعة:**\n━━━━━━━━━━━━━━━━━━\n\n⚜️ لا توجد سجلات ملوك متاحة حالياً.\n\n━━━━━━━━━━━━━━━━━━"
-        buttons = [[Button.inline("❌ إغلاق", "close")]]
-        if isinstance(event, events.CallbackQuery.Event):
-            await event.edit(text, buttons=buttons)
-        else:
-            await event.reply(text, buttons=buttons)
-        return
-
-    page_size = 5
-    total_pages = (len(kings) + page_size - 1) // page_size
-    page = max(0, min(page, total_pages - 1))
-    
-    start = page * page_size
-    end = start + page_size
-    page_kings = kings[start:end]
-    
-    report = f"👑 **قائمة ملوك المجموعة (صفحة {page + 1}/{total_pages}):**\n━━━━━━━━━━━━━━━━━━\n\n"
-    
-    buttons = []
-    for i, k in enumerate(page_kings, start=1):
-        row_id, name, s6, s5, s4, s3, s2, s1, total = k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8]
-        rank_num = start + i
-        
-        # 👑 اسم الملك بالخط العريض مع التاج وعدد النقاط، وفصل خط عريض بين الأسماء
-        report += f"⚜️ **{rank_num}. 👑 {name}** — 💎 النقاط: `{total}`\n"
-        report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        
-        # زر الـ Play بجانب اسم الملك لعرض تفاصيله الكاملة
-        buttons.append([Button.inline(f"▶️ عرض تفاصيل الملك: {name}", f"king_det_{row_id}")])
-        
-    # أزرار التنقل بين الصفحات
-    nav_buttons = []
-    if page > 0: 
-        nav_buttons.append(Button.inline("⏪ رجوع", f"kpage_{page-1}"))
-    if page < total_pages - 1: 
-        nav_buttons.append(Button.inline("التالي ⏩", f"kpage_{page+1}"))
-    
-    if nav_buttons: 
-        buttons.append(nav_buttons)
-    buttons.append([Button.inline("❌ إغلاق", "close")])
-    
-    if isinstance(event, events.CallbackQuery.Event):
-        await event.edit(report, buttons=buttons)
-    else:
-        await event.reply(report, buttons=buttons)
-
-
-# --- 👑 دالة عرض تفاصيل الملك الفردية عند الضغط على زر Play ---
-async def send_king_detail_view(event, row_id):
-    conn = sqlite3.connect(DB_KINGS_NAME)
-    cursor = conn.cursor()
-    cursor.execute("""SELECT rowid, member_name, stars_6, stars_5, stars_4, stars_3, stars_2, stars_1, total_stars 
-                      FROM kings_ranking WHERE rowid = ?""", (row_id,))
-    king = cursor.fetchone()
-    conn.close()
-    
-    if not king:
-        await event.answer("⚠️ عذراً، لم يتم العثور على بيانات هذا الملك.", alert=True)
-        return
-
-    _, name, s6, s5, s4, s3, s2, s1, total = king
-    total_cards_count = s6 + s5 + s4 + s3 + s2 + s1
-    
-    detail_text = (
-        f"👑 **سجل تفاصيل الملك الملكي**\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"👤 **الاسم : {name}**\n"
-        f"⭐ **كرت ست نجوم : {s6}**\n"
-        f"⭐ **كرت خمس نجوم : {s5}**\n"
-        f"⭐ **كرت اربعة نجوم : {s4}**\n"
-        f"⭐ **كرت ثلاثة نجوم : {s3}**\n"
-        f"⭐ **كرت نجمتين : {s2}**\n"
-        f"⭐ **كرت نجمة : {s1}**\n\n"
-        f"💎 **مجموع النقاط : {total}**\n"
-        f"📦 **مجموع الكروت : {total_cards_count}**\n"
-        f"━━━━━━━━━━━━━━━━━━"
-    )
-    
-    buttons = [
-        [Button.inline("🔙 العودة لقائمة الملوك", "kpage_0")],
-        [Button.inline("❌ إغلاق", "close")]
-    ]
-    
-    await event.edit(detail_text, buttons=buttons)
-
-
 @client.on(events.CallbackQuery)
 async def callback_handler(event):
     data = event.data.decode('utf-8')
     gid = str(event.chat_id)
     
-    # 👑 معالجة أزرار التنقل الخاصة بقائمة الملوك
-    if data.startswith("kpage_"):
-        try:
-            page_num = int(data.split("_")[1])
-            await send_kings_page(event, page=page_num)
-            await event.answer()
-        except Exception as e:
-            print(f"Error in kings pagination: {e}")
-            await event.answer("حدث خطأ أثناء التنقل بين الصفحات.", alert=True)
-        return
-
-    # 👑 معالجة زر تفاصيل الملك (Play)
-    if data.startswith("king_det_"):
-        try:
-            row_id = int(data.split("_")[2])
-            await send_king_detail_view(event, row_id)
-            await event.answer()
-        except Exception as e:
-            print(f"Error in king detail view: {e}")
-            await event.answer("حدث خطأ أثناء عرض تفاصيل الملك.", alert=True)
-        return
-
     # زر الإغلاق العام
     if data == "close":
         try:
