@@ -782,7 +782,8 @@ async def callback_handler(event):
         if not kings:
             await event.answer("قائمة الملوك فارغة حالياً!", alert=True)
             return
-        await send_kings_page(event, kings, 0)
+        await send_kings_page(event, 0)
+
     else:
         action, name = data.split("_")
         user_edit_state[event.sender_id] = {"name": name, "action": action, "step": "wait_index"}
